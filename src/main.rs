@@ -41,6 +41,9 @@ fn main() {
     let grid = gtk::Grid::new();
     window.add(&grid);
 
+    let workspaces = Workspaces::new();
+    grid.add(&workspaces.borrow().widget);
+
     let separator = Separator::new(false, true);
     grid.add(&separator.borrow().widget);
 
