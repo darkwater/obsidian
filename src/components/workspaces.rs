@@ -1,30 +1,39 @@
-extern crate time;
 extern crate cairo;
 extern crate gtk;
+extern crate time;
 
 use gtk::prelude::*;
 use std::cell::RefCell;
+use std::io::{BufReader, BufRead};
+use std::process::{Command, Stdio};
 use std::rc::Rc;
+use std::sync::Mutex;
+use std::thread;
 
 pub struct Workspaces {
     pub widget: gtk::DrawingArea,
-    screens: Vec<Screen>
+    screens: Mutex<Vec<Screen>>
 }
 
+#[derive(Debug)]
 struct Screen {
-    id: i64,
+    index: i64,
+    active: bool,
     workspaces: Vec<Workspace>
 }
 
+#[derive(Debug)]
 struct Workspace {
-    id: i64,
-    state: WorkspaceState
+    index: i64,
+    state: WorkspaceState,
+    active: bool
 }
 
+#[derive(Debug, Copy, Clone)]
 enum WorkspaceState {
-    Empty,
-    Used,
-    Current
+    Free,
+    Occupied,
+    Urgent
 }
 
 impl Workspaces {
@@ -35,65 +44,101 @@ impl Workspaces {
 
         let workspaces = Rc::new(RefCell::new(Workspaces {
             widget: widget,
-            screens: vec![
-                Screen { id: 0x00400003, workspaces: vec![
-                    Workspace { id: 0x00400008, state: WorkspaceState::Used  },
-                    Workspace { id: 0x0040000A, state: WorkspaceState::Used  },
-                    Workspace { id: 0x0040000B, state: WorkspaceState::Empty },
-                ] },
-                Screen { id: 0x00400001, workspaces: vec![
-                    Workspace { id: 0x00400008, state: WorkspaceState::Current },
-                    Workspace { id: 0x0040000A, state: WorkspaceState::Used    },
-                    Workspace { id: 0x0040000B, state: WorkspaceState::Empty   },
-                ] },
-                Screen { id: 0x00400005, workspaces: vec![
-                    Workspace { id: 0x00400007, state: WorkspaceState::Used },
-                    Workspace { id: 0x0040000F, state: WorkspaceState::Empty },
-                    Workspace { id: 0x00400010, state: WorkspaceState::Empty },
-                ] }
-            ]
+            screens: Mutex::new(vec![])
         }));
 
         workspaces.borrow().widget.connect_draw(clone!(workspaces => move |widget, cx| {
             workspaces.borrow().draw(widget, cx)
         }));
 
-        // gtk::timeout_add(1000, clone!(workspaces => move || {
-        //     workspaces.borrow_mut().update();
-        //     Continue(true)
-        // }));
+        thread::spawn(|| {
+            let bspc = Command::new("bspc")
+                .args(&[ "subscribe", "report" ])
+                .stdout(Stdio::piped())
+                .spawn()
+                .unwrap();
 
-        workspaces.borrow_mut().update();
+            let reader = BufReader::new(bspc.stdout.unwrap());
+
+            // XXX: Depends on 'L' to be the last itype sent
+            for line in reader.lines() {
+                let line = line.unwrap();
+
+                let mut nscreen = 1;
+                let mut nworkspace = 1;
+
+                let mut screens: Vec<Screen> = vec![];
+                let mut workspaces: Vec<Workspace> = vec![];
+                let mut screen_active = false;
+
+                for item in line[1..].split(':') {
+                    let mut chars = item.chars();
+                    let itype = chars.next().expect("bspc reported an empty item");
+                    let ivalue = chars.as_str();
+
+                    match itype {
+                        'M' => screen_active = true,
+                        'm' => screen_active = false,
+                        'F' | 'f' | 'O' | 'o' | 'U' | 'u' => {
+                            workspaces.push(Workspace {
+                                index: nworkspace,
+                                state: match itype {
+                                    'F' | 'f' => WorkspaceState::Free,
+                                    'O' | 'o' => WorkspaceState::Occupied,
+                                    _         => WorkspaceState::Urgent
+                                },
+                                active: match itype {
+                                    'F' | 'O' | 'U' => true,
+                                    _               => false
+                                }
+                            });
+
+                            nworkspace += 1;
+                        },
+                        'L' => {
+                            screens.push(Screen {
+                                index: nscreen,
+                                active: screen_active,
+                                workspaces: workspaces
+                            });
+
+                            nscreen += 1;
+                            workspaces = vec![];
+                        },
+                        _ => ()
+                    }
+                }
+
+                println!("{:?}", screens);
+            }
+
+            // widget.queue_draw();
+        });
 
         workspaces
     }
 
-    fn update(&mut self) {
-        // let now = time::now();
-        // let weekday = [ "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" ][now.tm_wday as usize];
-
-        // self.text = format!("{} {} {:02}:{:02}", weekday, now.tm_mday, now.tm_hour, now.tm_min);
-        // self.widget.queue_draw();
-    }
-
     fn draw(&self, widget: &gtk::DrawingArea, context: &cairo::Context) -> gtk::Inhibit {
+        let screens = self.screens.lock().unwrap();
+        if screens.len() == 0 { return Inhibit(false) }
+
         let height = widget.get_allocated_height() as f64;
         let padding = 10.0;
         let workspace_width = 20.0;
         let workspace_height = height - padding * 2.0;
         let workspace_padding = 6.0;
         let screen_padding = 15.0;
-        let skew = 2.0;
+        let skew = 1.0;
 
-        let first_workspace = self.screens.first().unwrap().workspaces.first().unwrap() as *const Workspace;
-        let last_workspace  = self.screens.last().unwrap().workspaces.last().unwrap() as *const Workspace;
+        let first_workspace = screens.first().unwrap().workspaces.first().unwrap() as *const Workspace;
+        let last_workspace  = screens.last().unwrap().workspaces.last().unwrap() as *const Workspace;
 
         context.set_line_width(1.0);
 
         let mut screen_left = 10.0;
-        let num_screens = self.screens.len();
+        let num_screens = screens.len();
 
-        for screen in self.screens.as_slice() {
+        for screen in screens.as_slice() {
             let top         = padding;
             let bottom      = padding + workspace_height;
 
@@ -115,10 +160,11 @@ impl Workspaces {
                 context.line_to(left_bottom - 0.5,  bottom + 0.5);
                 context.close_path();
 
-                match workspace.state {
-                    WorkspaceState::Empty   => context.set_source_rgba(1.0, 1.0, 1.0, 0.3),
-                    WorkspaceState::Used    => context.set_source_rgba(1.0, 1.0, 1.0, 0.2),
-                    WorkspaceState::Current => context.set_source_rgba(1.0, 1.0, 1.0, 0.9),
+                match (workspace.active, workspace.state) {
+                    (_,     WorkspaceState::Urgent)   => context.set_source_rgba(1.0, 0.69, 0.0, 0.9),
+                    (false, WorkspaceState::Free)     => context.set_source_rgba(1.0, 1.0,  1.0, 0.3),
+                    (false, WorkspaceState::Occupied) => context.set_source_rgba(1.0, 1.0,  1.0, 0.3),
+                    (true,  _)                        => context.set_source_rgba(1.0, 1.0,  1.0, 1.0),
                 }
                 context.stroke();
 
@@ -127,10 +173,11 @@ impl Workspaces {
                 context.line_to(right_bottom, bottom);
                 context.line_to(left_bottom,  bottom);
 
-                match workspace.state {
-                    WorkspaceState::Empty   => context.set_source_rgba(0.0, 0.0, 0.0, 0.2),
-                    WorkspaceState::Used    => context.set_source_rgba(1.0, 1.0, 1.0, 0.2),
-                    WorkspaceState::Current => context.set_source_rgba(1.0, 1.0, 1.0, 0.7),
+                match (workspace.active, workspace.state) {
+                    (_,     WorkspaceState::Urgent)   => context.set_source_rgba(1.0, 0.6, 0.0, 0.7),
+                    (false, WorkspaceState::Free)     => context.set_source_rgba(0.0, 0.0, 0.0, 0.2),
+                    (false, WorkspaceState::Occupied) => context.set_source_rgba(1.0, 1.0, 1.0, 0.3),
+                    (true,  _)                        => context.set_source_rgba(1.0, 1.0, 1.0, 0.8),
                 }
                 context.fill();
 
