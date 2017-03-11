@@ -1,3 +1,5 @@
+#![feature(range_contains)]
+
 extern crate gtk;
 extern crate gdk;
 
