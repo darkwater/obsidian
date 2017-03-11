@@ -13,7 +13,7 @@ use std::rc::Rc;
 use std::sync::mpsc::channel;
 use std::thread;
 
-pub struct Workspaces {
+pub struct WorkspacesComponent {
     pub widget: gtk::DrawingArea,
     workspaces: Vec<Workspace>
 }
@@ -46,7 +46,7 @@ enum WorkspaceState {
     Urgent
 }
 
-impl Workspaces {
+impl WorkspacesComponent {
     pub fn new() -> Rc<RefCell<Self>> {
         let widget = gtk::DrawingArea::new();
         widget.set_size_request(100, -1);
@@ -58,7 +58,7 @@ impl Workspaces {
         events |= gdk_sys::GDK_BUTTON_RELEASE_MASK.bits() as i32;
         widget.set_events(events);
 
-        let workspaces_component = Rc::new(RefCell::new(Workspaces {
+        let workspaces_component = Rc::new(RefCell::new(WorkspacesComponent {
             widget: widget,
             workspaces: vec![]
         }));
@@ -79,7 +79,7 @@ impl Workspaces {
 
         gtk::timeout_add(10, clone!(workspaces_component => move || {
             if let Ok(line) = rx.try_recv() {
-                let workspace_width = 20.0;
+                let workspace_width = 35.0;
                 let workspace_padding = 6.0;
                 let screen_padding = 15.0;
 

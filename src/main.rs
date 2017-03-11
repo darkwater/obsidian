@@ -43,10 +43,16 @@ fn main() {
     let grid = gtk::Grid::new();
     window.add(&grid);
 
-    let workspaces = Workspaces::new();
+    let workspaces = WorkspacesComponent::new();
     grid.add(&workspaces.borrow().widget);
 
     let separator = Separator::new(false, true);
+    grid.add(&separator.borrow().widget);
+
+    let battery = BatteryComponent::new();
+    grid.add(&battery.borrow().widget);
+
+    let separator = Separator::new(true, false);
     grid.add(&separator.borrow().widget);
 
     let clock = ClockComponent::new();

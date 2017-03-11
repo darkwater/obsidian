@@ -56,7 +56,7 @@ impl ClockComponent {
 
         let extents = context.text_extents(text);
         let x = width  / 2.0 - extents.width  / 2.0 - extents.x_bearing;
-        let y = height / 2.0 - extents.height / 2.0 - extents.y_bearing - 1.0;
+        let y = height / 2.0 - extents.height / 2.0 - extents.y_bearing;
 
         context.move_to(x, y);
         context.set_source_rgba(1.0, 1.0, 1.0, 0.95);
