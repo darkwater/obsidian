@@ -49,7 +49,7 @@ enum WorkspaceState {
 impl Workspaces {
     pub fn new() -> Rc<RefCell<Self>> {
         let widget = gtk::DrawingArea::new();
-        widget.set_size_request(350, -1);
+        widget.set_size_request(100, -1);
         widget.set_vexpand(true);
 
         // Tell gtk we actually want to receive the events
@@ -130,9 +130,12 @@ impl Workspaces {
                     }
                 }
 
+                workspace_left -= workspace_padding;
+
                 let mut workspaces_component = workspaces_component.borrow_mut();
                 workspaces_component.workspaces = workspaces;
                 workspaces_component.widget.queue_draw();
+                workspaces_component.widget.set_size_request(workspace_left as i32, -1);
             }
 
             Continue(true)
