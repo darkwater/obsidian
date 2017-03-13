@@ -8,7 +8,8 @@ use std::rc::Rc;
 
 pub struct ClockComponent {
     pub widget: gtk::DrawingArea,
-    text: String
+    text: String,
+    color: (f64, f64, f64)
 }
 
 impl ClockComponent {
@@ -19,7 +20,8 @@ impl ClockComponent {
 
         let clock = Rc::new(RefCell::new(ClockComponent {
             widget: widget,
-            text: "00:00:00".to_string()
+            text: "Day 01 12:34".to_string(),
+            color: (1.0, 1.0, 1.0)
         }));
 
         clock.borrow().widget.connect_draw(clone!(clock => move |widget, cx| {
@@ -40,6 +42,14 @@ impl ClockComponent {
         let now = time::now();
         let weekday = [ "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" ][now.tm_wday as usize];
 
+        self.color = match now.tm_hour {
+             0... 5 => (0.43, 0.53, 0.55),
+             6...11 => (0.49, 0.76, 0.81),
+            12...17 => (0.72, 0.84, 0.55),
+            18...23 => (0.88, 0.67, 0.36),
+            _       => (1.0,  1.0,  1.0)
+        };
+
         self.text = format!("{} {} {:02}:{:02}", weekday, now.tm_mday, now.tm_hour, now.tm_min);
         self.widget.queue_draw();
     }
@@ -58,8 +68,10 @@ impl ClockComponent {
         let x = width  / 2.0 - extents.width  / 2.0 - extents.x_bearing;
         let y = height / 2.0 - extents.height / 2.0 - extents.y_bearing;
 
+        let (r, g, b) = self.color;
+
         context.move_to(x, y);
-        context.set_source_rgba(1.0, 1.0, 1.0, 0.95);
+        context.set_source_rgba(r, g, b, 0.95);
         context.show_text(text);
 
         Inhibit(false)
