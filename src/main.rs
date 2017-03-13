@@ -1,12 +1,13 @@
 #![feature(range_contains)]
 
-extern crate gtk;
 extern crate gdk;
+extern crate gtk;
 
 mod components;
 
 use components::*;
 use gtk::prelude::*;
+use std::fs::File;
 
 fn main() {
     if gtk::init().is_err() {
@@ -49,11 +50,13 @@ fn main() {
     let separator = Separator::new(false, true);
     grid.add(&separator.borrow().widget);
 
-    let battery = BatteryComponent::new();
-    grid.add(&battery.borrow().widget);
+    if let Ok(_) = File::open("/sys/class/power_supply/BAT1/capacity") {
+        let battery = BatteryComponent::new();
+        grid.add(&battery.borrow().widget);
 
-    let separator = Separator::new(true, false);
-    grid.add(&separator.borrow().widget);
+        let separator = Separator::new(true, false);
+        grid.add(&separator.borrow().widget);
+    }
 
     let clock = ClockComponent::new();
     grid.add(&clock.borrow().widget);
