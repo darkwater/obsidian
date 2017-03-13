@@ -94,7 +94,7 @@ impl WorkspacesComponent {
                 for item in line[1..].split(':') {
                     let mut chars = item.chars();
                     let itype = chars.next().expect("bspc reported an empty item");
-                    let ivalue = chars.as_str();
+                    // let ivalue = chars.as_str();
 
                     match itype {
                         'M' => screen_active = true,
@@ -162,7 +162,11 @@ impl WorkspacesComponent {
     }
 
     fn button_release(&self, widget: &gtk::DrawingArea, event: &gdk::EventButton) -> gtk::Inhibit {
-        let (x, _) = event.get_position();
+        let (x, y) = event.get_position();
+
+        if 0.0 > y || y > widget.get_allocated_height() as f64 {
+            return Inhibit(true)
+        }
 
         for workspace in self.workspaces.as_slice() {
             if workspace.position.contains(x) {

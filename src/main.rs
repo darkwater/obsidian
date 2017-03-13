@@ -47,14 +47,14 @@ fn main() {
     let workspaces = WorkspacesComponent::new();
     grid.add(&workspaces.borrow().widget);
 
-    let separator = Separator::new(false, true);
+    let separator = Separator::new(separator::Type::Spacer);
     grid.add(&separator.borrow().widget);
 
     if let Ok(_) = File::open("/sys/class/power_supply/BAT1/capacity") {
         let battery = BatteryComponent::new();
         grid.add(&battery.borrow().widget);
 
-        let separator = Separator::new(true, false);
+        let separator = Separator::new(separator::Type::Visual(1));
         grid.add(&separator.borrow().widget);
     }
 

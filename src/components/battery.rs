@@ -10,8 +10,6 @@ use std::fs::File;
 use std::os::unix::net::UnixStream;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::ops::Range;
-use std::process::{Command, Stdio};
 use std::rc::Rc;
 use std::sync::mpsc::channel;
 use std::thread;
@@ -90,13 +88,13 @@ impl BatteryComponent {
     fn update(&mut self) {
         let mut file = File::open("/sys/class/power_supply/BAT1/capacity").expect("Couldn't find battery");
         let mut string = String::with_capacity(4);
-        file.read_to_string(&mut string);
+        let _ = file.read_to_string(&mut string);
 
         self.capacity = i8::from_str_radix(&string.trim(), 10).expect("Expected an integer from battery capacity.");
 
         let mut file = File::open("/sys/class/power_supply/BAT1/status").expect("Couldn't find battery");
         let mut string = String::with_capacity(4);
-        file.read_to_string(&mut string);
+        let _ = file.read_to_string(&mut string);
 
         self.charging = match string.trim() {
             "Charging" => true,
