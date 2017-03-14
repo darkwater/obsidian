@@ -7,10 +7,11 @@ extern crate time;
 use gtk::prelude::*;
 use std::cell::RefCell;
 use std::fs::File;
-use std::os::unix::net::UnixStream;
-use std::io::prelude::*;
 use std::io::BufReader;
+use std::io::prelude::*;
+use std::os::unix::net::UnixStream;
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::thread;
 
@@ -90,10 +91,10 @@ impl BatteryComponent {
         let mut string = String::with_capacity(4);
         let _ = file.read_to_string(&mut string);
 
-        self.capacity = i8::from_str_radix(&string.trim(), 10).expect("Expected an integer from battery capacity.");
+        self.capacity = i8::from_str(&string.trim()).expect("Expected an integer from battery capacity.");
 
         let mut file = File::open("/sys/class/power_supply/BAT1/status").expect("Couldn't find battery");
-        let mut string = String::with_capacity(4);
+        let mut string = String::with_capacity(16);
         let _ = file.read_to_string(&mut string);
 
         self.charging = match string.trim() {
