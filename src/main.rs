@@ -50,6 +50,12 @@ fn main() {
     let separator = Separator::new(separator::Type::Spacer);
     grid.add(&separator.borrow().widget);
 
+    let mem = MemoryComponent::new();
+    grid.add(&mem.borrow().widget);
+
+    let separator = Separator::new(separator::Type::Visual(1));
+    grid.add(&separator.borrow().widget);
+
     let load = LoadComponent::new();
     grid.add(&load.borrow().widget);
 

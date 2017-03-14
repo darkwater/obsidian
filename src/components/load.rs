@@ -60,7 +60,7 @@ impl LoadComponent {
         let mut file = File::open("/proc/loadavg").expect("Couldn't open /proc/loadavg");
         let mut string = String::with_capacity(32);
         let _ = file.read_to_string(&mut string);
-        let mut split = string.split(' ');
+        let mut split = string.split_whitespace();
 
         self.loadavg = f64::from_str(&split.nth(1).unwrap()).expect("Expected a float from /proc/loadavg");
 
