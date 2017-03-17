@@ -2,12 +2,19 @@
 
 extern crate gdk;
 extern crate gtk;
+extern crate time;
+
+#[macro_use]
+mod util;
 
 mod components;
+mod status_component;
+mod status;
 
 use components::*;
 use gtk::prelude::*;
 use std::fs::File;
+use status_component::*;
 
 fn main() {
     if gtk::init().is_err() {
@@ -50,28 +57,19 @@ fn main() {
     let separator = Separator::new(separator::Type::Spacer);
     grid.add(&separator.borrow().widget);
 
-    let mem = MemoryComponent::new();
-    grid.add(&mem.borrow().widget);
+    let mut first = true;
+    let items = vec![ status::clock ];
+    for item in items {
+        if first {
+            first = false
+        } else {
+            let separator = Separator::new(separator::Type::Visual(1));
+            grid.add(&separator.borrow().widget);
+        }
 
-    let separator = Separator::new(separator::Type::Visual(1));
-    grid.add(&separator.borrow().widget);
-
-    let load = LoadComponent::new();
-    grid.add(&load.borrow().widget);
-
-    let separator = Separator::new(separator::Type::Visual(1));
-    grid.add(&separator.borrow().widget);
-
-    if let Ok(_) = File::open("/sys/class/power_supply/BAT1/capacity") {
-        let battery = BatteryComponent::new();
-        grid.add(&battery.borrow().widget);
-
-        let separator = Separator::new(separator::Type::Visual(1));
-        grid.add(&separator.borrow().widget);
+        let status = StatusComponent::new(item);
+        grid.add(&status.borrow().widget);
     }
-
-    let clock = ClockComponent::new();
-    grid.add(&clock.borrow().widget);
 
     window.show_all();
 
