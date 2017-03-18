@@ -1,6 +1,7 @@
 #![feature(range_contains)]
 
 extern crate gdk;
+extern crate gdk_sys;
 extern crate gtk;
 extern crate time;
 
@@ -26,11 +27,12 @@ fn main() {
     window.set_name("bar");
     window.set_type_hint(gdk::WindowTypeHint::Dock);
     window.set_decorated(false);
-
-    let style_context = window.get_style_context().unwrap();
-    let css_provider = gtk::CssProvider::new();
-    let _ = css_provider.load_from_data("* { background-color: #1d1f21; }");
-    style_context.add_provider(&css_provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+    window.override_background_color(gtk::STATE_FLAG_NORMAL, &gdk_sys::GdkRGBA {
+        red:   0x1d as f64 / 255.0,
+        green: 0x1f as f64 / 255.0,
+        blue:  0x21 as f64 / 255.0,
+        alpha: 1.0
+    });
 
     let screen = window.get_screen().unwrap();
     let monitor_id = screen.get_primary_monitor();
@@ -58,7 +60,7 @@ fn main() {
     grid.add(&separator.borrow().widget);
 
     let mut first = true;
-    let items = vec![ status::clock ];
+    let items = vec![ "battery", "clock" ];
     for item in items {
         if first {
             first = false
@@ -67,7 +69,13 @@ fn main() {
             grid.add(&separator.borrow().widget);
         }
 
-        let status = StatusComponent::new(item);
+        let update_fn = match item {
+            "clock"   => status::clock,
+            "battery" => status::battery,
+            _ => unreachable!()
+        };
+
+        let status = StatusComponent::new(update_fn);
         grid.add(&status.borrow().widget);
     }
 

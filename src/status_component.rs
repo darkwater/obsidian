@@ -102,7 +102,7 @@ impl StatusComponent {
         context.move_to(x, y);
         context.show_text(text);
 
-        let used_width = extents.width + 20.0;
+        let used_width = extents.width + 30.0;
 
         match self.size_request.get() {
             SizeRequest::Expand => {
