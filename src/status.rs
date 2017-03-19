@@ -1,12 +1,11 @@
 // vim: fdm=syntax fdn=1
 extern crate time;
 
-use status_component::*;
+use components::*;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::prelude::*;
 use std::os::unix::net::UnixStream;
-use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
@@ -44,6 +43,7 @@ pub fn clock(tx: Sender<Vec<StatusChange>>) {
         thread::sleep(sleep_time);
     }
 }
+
 pub fn battery(tx: Sender<Vec<StatusChange>>) {
     let changes = vec![
         StatusChange::Text("100%".to_string()),
@@ -122,7 +122,9 @@ pub fn battery(tx: Sender<Vec<StatusChange>>) {
     loop {
         if let Ok(change) = bat_rx.try_recv() {
             match change {
-                BatteryChange::Capacity(capacity) => {
+                BatteryChange::Capacity(new_cap) => {
+                    capacity = new_cap;
+
                     let text = format!("{}%", capacity);
                     let color = determine_color(capacity, charging);
 
@@ -133,7 +135,9 @@ pub fn battery(tx: Sender<Vec<StatusChange>>) {
 
                     let _ = tx.send(changes);
                 },
-                BatteryChange::Charging(charging) => {
+                BatteryChange::Charging(new_charge) => {
+                    charging = new_charge;
+
                     let color = determine_color(capacity, charging);
 
                     let changes = vec![
@@ -146,6 +150,99 @@ pub fn battery(tx: Sender<Vec<StatusChange>>) {
         }
 
         let sleep_time = ::std::time::Duration::from_millis(50);
+        thread::sleep(sleep_time);
+    }
+}
+
+pub fn load(tx: Sender<Vec<StatusChange>>) {
+    let changes = vec![
+        StatusChange::Text("00.00".to_string()),
+        StatusChange::Size(SizeRequest::Set)
+    ];
+
+    let _ = tx.send(changes);
+
+    loop {
+        let mut file = File::open("/proc/loadavg").expect("Couldn't open /proc/loadavg");
+        let mut string = String::with_capacity(32);
+        let _ = file.read_to_string(&mut string);
+        let mut split = string.split_whitespace();
+
+        let loadavg = f64::from_str(&split.nth(1).unwrap()).expect("Expected a float from /proc/loadavg");
+
+        let file = File::open("/proc/cpuinfo").expect("Couldn't open /proc/cpuinfo");
+        let reader = BufReader::new(file);
+        let mut num_processors = 0;
+        for line in reader.lines() {
+            if line.expect("Error while reading /proc/cpuinfo").starts_with("processor") {
+                num_processors += 1;
+            }
+        }
+
+        let normalized_loadavg = loadavg / num_processors as f64;
+
+        let text = format!("{:.2}", loadavg);
+
+        let color = match normalized_loadavg {
+            0.0...0.1 => (0.2, 1.0, 0.5, 0.95),
+            0.1...0.4 => (0.1, 1.0, 0.1, 0.95),
+            0.4...0.8 => (1.0, 0.7, 0.0, 0.95),
+            _         => (1.0, 0.3, 0.1, 0.95),
+        };
+
+        let changes = vec![
+            StatusChange::Text(text),
+            StatusChange::Color(color)
+        ];
+
+        let _ = tx.send(changes);
+
+        let sleep_time = ::std::time::Duration::from_secs(5);
+        thread::sleep(sleep_time);
+    }
+}
+
+pub fn memory(tx: Sender<Vec<StatusChange>>) {
+    let changes = vec![
+        StatusChange::Text("100%".to_string()),
+        StatusChange::Size(SizeRequest::Set)
+    ];
+
+    let _ = tx.send(changes);
+
+    loop {
+        let file = File::open("/proc/meminfo").expect("Couldn't open /proc/meminfo");
+        let reader = BufReader::new(file);
+        let mut lines = reader.lines();
+
+        // XXX: Currently relies on the order of items in meminfo
+        let mem_total = i64::from_str(&lines.next().unwrap().unwrap().split_whitespace().nth(1).unwrap())
+            .expect("Expected an integer from meminfo");
+
+        lines.next(); // skip 'free'
+
+        let mem_available = i64::from_str(&lines.next().unwrap().unwrap().split_whitespace().nth(1).unwrap())
+            .expect("Expected an integer from meminfo");
+
+        let mem_usage = 100 - (mem_available * 100 / mem_total);
+
+        let text = format!("{}%", mem_usage);
+
+        let color = match mem_usage {
+            0...20 => (0.2, 1.0, 0.5, 0.95),
+           21...40 => (0.1, 1.0, 0.1, 0.95),
+           41...85 => (1.0, 0.7, 0.0, 0.95),
+           _       => (1.0, 0.3, 0.1, 0.95),
+        };
+
+        let changes = vec![
+            StatusChange::Text(text),
+            StatusChange::Color(color)
+        ];
+
+        let _ = tx.send(changes);
+
+        let sleep_time = ::std::time::Duration::from_secs(8);
         thread::sleep(sleep_time);
     }
 }

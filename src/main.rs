@@ -9,13 +9,12 @@ extern crate time;
 mod util;
 
 mod components;
-mod status_component;
+mod separator;
 mod status;
 
 use components::*;
+use separator::*;
 use gtk::prelude::*;
-use std::fs::File;
-use status_component::*;
 
 fn main() {
     if gtk::init().is_err() {
@@ -60,7 +59,7 @@ fn main() {
     grid.add(&separator.borrow().widget);
 
     let mut first = true;
-    let items = vec![ "battery", "clock" ];
+    let items = vec![ "memory", "load", "battery", "clock" ];
     for item in items {
         if first {
             first = false
@@ -72,6 +71,8 @@ fn main() {
         let update_fn = match item {
             "clock"   => status::clock,
             "battery" => status::battery,
+            "load"    => status::load,
+            "memory"  => status::memory,
             _ => unreachable!()
         };
 
