@@ -26,16 +26,14 @@ fn main() {
     window.set_name("bar");
     window.set_type_hint(gdk::WindowTypeHint::Dock);
     window.set_decorated(false);
-    window.override_background_color(gtk::STATE_FLAG_NORMAL, &gdk_sys::GdkRGBA {
-        red:   0x1d as f64 / 255.0,
-        green: 0x1f as f64 / 255.0,
-        blue:  0x21 as f64 / 255.0,
-        alpha: 1.0
-    });
 
     let screen = window.get_screen().unwrap();
     let monitor_id = screen.get_primary_monitor();
     let monitor = screen.get_monitor_geometry(monitor_id);
+
+    window.set_app_paintable(true);
+    let visual = screen.get_rgba_visual().unwrap();
+    window.set_visual(Some(&visual));
 
     let height = 25;
 
@@ -81,6 +79,13 @@ fn main() {
     }
 
     window.show_all();
+
+    window.get_window().unwrap().set_background_rgba(&gdk::RGBA {
+        red:   0x1d as f64 / 255.0,
+        green: 0x1f as f64 / 255.0,
+        blue:  0x21 as f64 / 255.0,
+        alpha: 0xeb as f64 / 255.0
+    });
 
     window.connect_delete_event(|_, _| {
         gtk::main_quit();
