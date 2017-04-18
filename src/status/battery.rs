@@ -13,7 +13,7 @@ use std::thread;
 pub struct BatteryStatusItem;
 impl StatusItem for BatteryStatusItem {
     fn check_available(&self) -> bool {
-        true
+        File::open("/sys/class/power_supply/BAT1/capacity").is_ok()
     }
 
     fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>) {

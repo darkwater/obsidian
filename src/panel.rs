@@ -78,6 +78,8 @@ impl Panel {
 
         let mut first = true;
         for item in &self.status_items {
+            if !item.check_available() { continue }
+
             if first {
                 first = false
             } else {
