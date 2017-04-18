@@ -4,6 +4,7 @@ extern crate gdk;
 extern crate gdk_sys;
 
 use gtk::prelude::*;
+use status::StatusItem;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::mpsc;
@@ -30,9 +31,7 @@ pub enum SizeRequest {
 }
 
 impl StatusComponent {
-    pub fn new<F>(update_fn: F) -> Rc<RefCell<Self>>
-        where F: Fn(mpsc::Sender<Vec<StatusChange>>),
-              F: Send, F: 'static
+    pub fn new(status_item: &Box<StatusItem>) -> Rc<RefCell<Self>>
     {
         let widget = gtk::DrawingArea::new();
         widget.set_size_request(10, -1);
@@ -57,9 +56,10 @@ impl StatusComponent {
             }));
         }
 
-        let (tx, rx) = mpsc::channel::<Vec<StatusChange>>();
+        let (sx, rx) = mpsc::channel::<Vec<StatusChange>>();
+        let update_fn = status_item.get_update_fun();
 
-        thread::spawn(move || update_fn(tx));
+        thread::spawn(move || update_fn(sx));
 
         gtk::timeout_add(50, clone!(status_component => move || {
             if let Ok(changes) = rx.try_recv() {
