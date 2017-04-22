@@ -162,6 +162,8 @@ impl WorkspacesComponent {
     }
 
     fn button_release(&self, widget: &gtk::DrawingArea, event: &gdk::EventButton) -> gtk::Inhibit {
+        if event.get_button() != 1 { return Inhibit(false) }
+
         let (x, y) = event.get_position();
 
         if 0.0 > y || y > widget.get_allocated_height() as f64 {
@@ -182,7 +184,7 @@ impl WorkspacesComponent {
             }
         }
 
-        Inhibit(false)
+        Inhibit(true)
     }
 
     fn draw(&self, widget: &gtk::DrawingArea, context: &cairo::Context) -> gtk::Inhibit {

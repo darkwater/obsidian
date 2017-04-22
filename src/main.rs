@@ -19,5 +19,6 @@ fn main() {
     let items = vec![ "memory", "load", "battery", "clock" ];
 
     let panel = Panel::new(items);
-    panel.main();
+
+    gtk::main();
 }
