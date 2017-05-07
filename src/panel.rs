@@ -161,8 +161,8 @@ impl Panel {
         let start_position = self.window.get_position();
         let start_size = self.window.get_size();
 
-        let mut end_position;
-        let mut end_size;
+        let end_position;
+        let end_size;
 
         match self.expanded {
             true  => { end_position = self.expanded_position;  end_size = self.expanded_size;  }
@@ -189,8 +189,6 @@ impl Panel {
 
             let frame_size = (interp(start_size.0, end_size.0, transition_now),
                               interp(start_size.1, end_size.1, transition_now));
-
-            println!("{:?} at {:?}", frame_position, frame_size);
 
             window.resize(frame_size.0, frame_size.1);
             window.move_(frame_position.0, frame_position.1);

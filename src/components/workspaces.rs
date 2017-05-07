@@ -190,18 +190,18 @@ impl WorkspacesComponent {
     fn draw(&self, widget: &gtk::DrawingArea, context: &cairo::Context) -> gtk::Inhibit {
         if self.workspaces.len() == 0 { return Inhibit(false) }
 
-        let padding = 10.0;
         let height = widget.get_allocated_height() as f64;
-        let workspace_height = height - padding * 2.0;
-        let skew = 1.0;
+        let workspace_height = height * 0.25;
+        let skew_ratio = 0.2;
+        let skew = workspace_height * skew_ratio;
 
         let first_workspace = self.workspaces.first().unwrap() as *const Workspace;
         let last_workspace  = self.workspaces.last().unwrap() as *const Workspace;
 
         context.set_line_width(1.0);
 
-        let top    = padding;
-        let bottom = padding + workspace_height;
+        let top    = (height / 2.0 - workspace_height / 2.0).ceil();
+        let bottom = (height / 2.0 + workspace_height / 2.0).floor();
 
         for workspace in self.workspaces.as_slice() {
             let mut left_top     = workspace.position.start;
