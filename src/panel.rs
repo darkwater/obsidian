@@ -26,13 +26,30 @@ enum PanelMsg {
 }
 
 impl Panel {
-    pub fn new(items: Vec<&str>) -> Rc<RefCell<Self>> {
+    pub fn new() -> Rc<RefCell<Self>> {
+        let items = vec![ "memory", "load", "battery", "clock" ];
+        let extra_items = vec![ "volume" ];
+
         let status_items: Vec<_> = items.iter().map(|item| {
             let item: Box<StatusItem> = match *item {
-                "memory"  => Box::new(MemoryStatusItem),
-                "load"    => Box::new(LoadStatusItem),
                 "battery" => Box::new(BatteryStatusItem),
                 "clock"   => Box::new(ClockStatusItem),
+                "load"    => Box::new(LoadStatusItem),
+                "memory"  => Box::new(MemoryStatusItem),
+                "volume"  => Box::new(VolumeStatusItem),
+                _         => unreachable!()
+            };
+
+            item
+        }).collect();
+
+        let extra_status_items: Vec<_> = extra_items.iter().map(|item| {
+            let item: Box<StatusItem> = match *item {
+                "battery" => Box::new(BatteryStatusItem),
+                "clock"   => Box::new(ClockStatusItem),
+                "load"    => Box::new(LoadStatusItem),
+                "memory"  => Box::new(MemoryStatusItem),
+                "volume"  => Box::new(VolumeStatusItem),
                 _         => unreachable!()
             };
 
@@ -107,6 +124,24 @@ impl Panel {
 
             let status = StatusComponent::new(item);
             top_bar.add(&status.borrow().widget);
+        }
+
+        let separator = Separator::new(separator::Type::Spacer);
+        middle_bar.add(&separator.borrow().widget);
+
+        let mut first = true;
+        for item in &extra_status_items {
+            if !item.check_available() { continue }
+
+            if first {
+                first = false
+            } else {
+                let separator = Separator::new(separator::Type::Visual(1));
+                middle_bar.add(&separator.borrow().widget);
+            }
+
+            let status = StatusComponent::new(item);
+            middle_bar.add(&status.borrow().widget);
         }
 
         window.show_all();

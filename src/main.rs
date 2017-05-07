@@ -16,9 +16,7 @@ mod panel;
 use panel::Panel;
 
 fn main() {
-    let items = vec![ "memory", "load", "battery", "clock" ];
-
-    let panel = Panel::new(items);
+    let panel = Panel::new();
 
     gtk::main();
 }

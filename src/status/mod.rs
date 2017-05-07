@@ -10,3 +10,4 @@ mod battery; pub use self::battery::BatteryStatusItem;
 mod clock;   pub use self::clock::ClockStatusItem;
 mod load;    pub use self::load::LoadStatusItem;
 mod memory;  pub use self::memory::MemoryStatusItem;
+mod volume;  pub use self::volume::VolumeStatusItem;
