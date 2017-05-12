@@ -6,23 +6,32 @@ use components::*;
 use gtk::prelude::*;
 use separator::{self, Separator};
 use status::*;
-use std::cell::RefCell;
-use std::ops::Mul;
+use std::cell::{Cell, RefCell};
+use std::ops::{Add, Mul};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 pub struct Panel {
-    expanded:           bool,
-    expanded_position:  (i32, i32),
-    expanded_size:      (i32, i32),
+    expanded:          bool,
+    hidden:            bool,
+    opacity:           Rc<Cell<f64>>,
+    state_information: PanelStateInformation,
+    status_items:      Vec<Box<StatusItem>>,
+    window:            gtk::Window,
+    gdk_window:        gdk::Window,
+}
+
+struct PanelStateInformation {
     collapsed_position: (i32, i32),
     collapsed_size:     (i32, i32),
-    status_items:       Vec<Box<StatusItem>>,
-    window:             gtk::Window
+    collapsed_opacity:  f64,
+    expanded_position:  (i32, i32),
+    expanded_size:      (i32, i32),
+    expanded_opacity:   f64,
 }
 
 enum PanelMsg {
-    ToggleExpand
+    ToggleExpand,
 }
 
 impl Panel {
@@ -73,17 +82,22 @@ impl Panel {
         let visual = screen.get_rgba_visual().unwrap();
         window.set_visual(Some(&visual));
 
-        let collapsed_height = 75;
-        let expanded_height  = 90;
+        let collapsed_visible_height = 25;
+        let collapsed_height         = 75;
+        let expanded_height          = 90;
 
-        let collapsed_position = (monitor.x, monitor.y + monitor.height - 25);
-        let collapsed_size     = (monitor.width, collapsed_height);
+        let state_information = PanelStateInformation {
+            collapsed_position: (monitor.x, monitor.y + monitor.height - collapsed_visible_height),
+            collapsed_size:     (monitor.width, collapsed_height),
+            collapsed_opacity:  0.0,
+            expanded_position:  (monitor.x, monitor.y + monitor.height - expanded_height),
+            expanded_size:      (monitor.width, expanded_height),
+            expanded_opacity:   0.92,
+        };
 
-        let expanded_position = (monitor.x, monitor.y + monitor.height - expanded_height);
-        let expanded_size     = (monitor.width, expanded_height);
-
-        window.move_(collapsed_position.0, collapsed_position.1);
-        window.resize(collapsed_size.0, collapsed_size.1);
+        let ((x, y), (width, height)) = (state_information.collapsed_position, state_information.collapsed_size);
+        window.move_(x, y);
+        window.resize(width, height);
 
         // reserve space
         // topw = window.get_toplevel().window
@@ -145,15 +159,18 @@ impl Panel {
         }
 
         window.show_all();
+        window.set_keep_above(true);
+
+        let gdk_window = window.get_window().unwrap();
 
         let panel = Rc::new(RefCell::new(Panel {
-            expanded: false,
-            expanded_position: expanded_position,
-            expanded_size: expanded_size,
-            collapsed_position: collapsed_position,
-            collapsed_size: collapsed_size,
-            status_items: status_items,
-            window: window
+            expanded:          false,
+            hidden:            false,
+            opacity:           Rc::new(Cell::new(state_information.collapsed_opacity)),
+            state_information: state_information,
+            status_items:      status_items,
+            window:            window,
+            gdk_window:        gdk_window,
         }));
 
         {
@@ -167,12 +184,29 @@ impl Panel {
                 Inhibit(false)
             }));
 
-            window.get_window().unwrap().set_background_rgba(&gdk::RGBA {
-                red:   0x1d as f64 / 255.0,
-                green: 0x1f as f64 / 255.0,
-                blue:  0x21 as f64 / 255.0,
-                alpha: 0xeb as f64 / 255.0
-            });
+            window.connect_draw(clone!(panel => move |widget, cx| {
+                let panel = panel.borrow();
+
+                let window_position = widget.get_window().unwrap().get_position();
+                let collapsed_position = panel.state_information.collapsed_position;
+
+                let (x, y) = (collapsed_position.0 - window_position.0, collapsed_position.1 - window_position.1);
+                let (width, height) = panel.state_information.collapsed_size;
+                let (r, g, b, a) = (0.11, 0.12, 0.13, 0.92);
+                cx.set_source_rgba(r, g, b, a);
+                cx.rectangle(x as f64, y as f64, width as f64, height as f64);
+                cx.fill();
+
+                let width  = widget.get_allocated_width()  as f64;
+                let height = widget.get_allocated_height() as f64;
+
+                let (r, g, b, a) = (0.10, 0.10, 0.10, panel.opacity.get());
+                cx.set_source_rgba(r, g, b, a);
+                cx.rectangle(0.0, 0.0, width, height);
+                cx.fill();
+
+                Inhibit(false)
+            }));
 
             window.connect_delete_event(|_, _| {
                 gtk::main_quit();
@@ -195,40 +229,58 @@ impl Panel {
 
         let start_position = self.window.get_position();
         let start_size = self.window.get_size();
+        let start_opacity;
 
         let end_position;
         let end_size;
+        let end_opacity;
 
         match self.expanded {
-            true  => { end_position = self.expanded_position;  end_size = self.expanded_size;  }
-            false => { end_position = self.collapsed_position; end_size = self.collapsed_size; }
+            true => {
+                start_opacity = self.state_information.collapsed_opacity;
+                end_position  = self.state_information.expanded_position;
+                end_size      = self.state_information.expanded_size;
+                end_opacity   = self.state_information.expanded_opacity;
+            }
+            false => {
+                start_opacity = self.state_information.expanded_opacity;
+                end_position  = self.state_information.collapsed_position;
+                end_size      = self.state_information.collapsed_size;
+                end_opacity   = self.state_information.collapsed_opacity;
+            }
         }
 
         let transition_duration = Duration::from_millis(160);
         let transition_start    = Instant::now();
 
         #[inline]
-        fn interp(start: i32, end: i32, i: f64) -> i32 {
-            (start as f64 * (1.0 - i) + end as f64 * i) as i32
+        fn interp(start: f64, end: f64, i: f64) -> f64 {
+            (start * (1.0 - i) + end * i)
         }
 
-        let ref window = self.window;
-        gtk::timeout_add(5, clone!(window => move || {
-            let mut transition_now = transition_start.elapsed().subsec_nanos() as f64
-                                   / transition_duration.subsec_nanos() as f64;
+        let window = self.window.clone();
+        let opacity = self.opacity.clone();
+        // gtk::timeout_add(5, move || {
+        //     let mut transition_now = transition_start.elapsed().subsec_nanos() as f64
+        //                            / transition_duration.subsec_nanos() as f64;
 
-            if transition_now > 1.0 { transition_now = 1.0 }
+        //     if transition_now > 1.0 { transition_now = 1.0 }
 
-            let frame_position = (interp(start_position.0, end_position.0, transition_now),
-                                  interp(start_position.1, end_position.1, transition_now));
+        let transition_now = 1.0;
 
-            let frame_size = (interp(start_size.0, end_size.0, transition_now),
-                              interp(start_size.1, end_size.1, transition_now));
+            let frame_position = (interp(start_position.0 as f64, end_position.0 as f64, transition_now) as i32,
+                                  interp(start_position.1 as f64, end_position.1 as f64, transition_now) as i32);
+
+            let frame_size = (interp(start_size.0 as f64, end_size.0 as f64, transition_now) as i32,
+                              interp(start_size.1 as f64, end_size.1 as f64, transition_now) as i32);
+
+            let frame_opacity = interp(start_opacity, end_opacity, transition_now);
 
             window.resize(frame_size.0, frame_size.1);
             window.move_(frame_position.0, frame_position.1);
+            opacity.set(frame_opacity);
 
-            Continue(transition_now < 1.0)
-        }));
+            // Continue(transition_now < 1.0)
+        // });
     }
 }
