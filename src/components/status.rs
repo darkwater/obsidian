@@ -105,12 +105,14 @@ impl StatusComponent {
             layout.set_text(icon, icon.len() as i32);
             layout.set_font_description(Some(&font));
 
-            let extents = layout.get_extents().1;
+            let extents = layout.get_extents().0;
+            let (icon_x, icon_y) = (extents.x as f64 / pango::SCALE as f64,
+                                    extents.y as f64 / pango::SCALE as f64);
             let (icon_width, icon_height) = (extents.width  as f64 / pango::SCALE as f64,
                                              extents.height as f64 / pango::SCALE as f64);
 
-            let x = margin;
-            let y = height / 2.0 - icon_height / 2.0;
+            let x = -icon_x as f64 + margin;
+            let y = -icon_y as f64 + height / 2.0 - icon_height / 2.0;
 
             let (r, g, b, a) = self.color;
             context.set_source_rgba(r, g, b, a);
