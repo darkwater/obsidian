@@ -7,7 +7,6 @@ use gtk::prelude::*;
 use separator::{self, Separator};
 use status::*;
 use std::cell::{Cell, RefCell};
-use std::ops::{Add, Mul};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -18,7 +17,6 @@ pub struct Panel {
     state_information: PanelStateInformation,
     status_items:      Vec<Box<StatusItem>>,
     window:            gtk::Window,
-    gdk_window:        gdk::Window,
 }
 
 struct PanelStateInformation {
@@ -161,8 +159,6 @@ impl Panel {
         window.show_all();
         window.set_keep_above(true);
 
-        let gdk_window = window.get_window().unwrap();
-
         let panel = Rc::new(RefCell::new(Panel {
             expanded:          false,
             hidden:            false,
@@ -170,7 +166,6 @@ impl Panel {
             state_information: state_information,
             status_items:      status_items,
             window:            window,
-            gdk_window:        gdk_window,
         }));
 
         {

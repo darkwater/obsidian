@@ -18,8 +18,7 @@ impl StatusItem for LoadStatusItem {
     fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>) {
         fn fun(sx: mpsc::Sender<Vec<StatusChange>>) {
             let changes = vec![
-                StatusChange::Text("00.00".to_string()),
-                StatusChange::Size(SizeRequest::Set)
+                StatusChange::Icon("equalizer".to_string()),
             ];
 
             let _ = sx.send(changes);
@@ -54,7 +53,8 @@ impl StatusItem for LoadStatusItem {
 
                 let changes = vec![
                     StatusChange::Text(text),
-                    StatusChange::Color(color)
+                    StatusChange::Color(color),
+                    StatusChange::Size(SizeRequest::Expand),
                 ];
 
                 let _ = sx.send(changes);

@@ -14,8 +14,7 @@ impl StatusItem for ClockStatusItem {
     fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>) {
         fn fun(sx: mpsc::Sender<Vec<StatusChange>>) {
             let changes = vec![
-                StatusChange::Text("Mmm 00 00:00".to_string()),
-                StatusChange::Size(SizeRequest::Set)
+                StatusChange::Icon("schedule".to_string()),
             ];
 
             let _ = sx.send(changes);
@@ -36,7 +35,8 @@ impl StatusItem for ClockStatusItem {
 
                 let changes = vec![
                     StatusChange::Text(text),
-                    StatusChange::Color(color)
+                    StatusChange::Color(color),
+                    StatusChange::Size(SizeRequest::Expand),
                 ];
 
                 let _ = sx.send(changes);

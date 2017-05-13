@@ -19,8 +19,7 @@ impl StatusItem for BatteryStatusItem {
     fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>) {
         fn fun(sx: mpsc::Sender<Vec<StatusChange>>) {
             let changes = vec![
-                StatusChange::Text("100%".to_string()),
-                StatusChange::Size(SizeRequest::Set)
+                StatusChange::Icon("battery_full".to_string()),
             ];
 
             let _ = sx.send(changes);
@@ -103,7 +102,8 @@ impl StatusItem for BatteryStatusItem {
 
                             let changes = vec![
                                 StatusChange::Text(text),
-                                StatusChange::Color(color)
+                                StatusChange::Color(color),
+                                StatusChange::Size(SizeRequest::Expand),
                             ];
 
                             let _ = sx.send(changes);
@@ -114,7 +114,8 @@ impl StatusItem for BatteryStatusItem {
                             let color = determine_color(capacity, charging);
 
                             let changes = vec![
-                                StatusChange::Color(color)
+                                StatusChange::Color(color),
+                                StatusChange::Size(SizeRequest::Expand),
                             ];
 
                             let _ = sx.send(changes);
