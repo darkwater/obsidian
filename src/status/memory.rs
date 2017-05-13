@@ -11,8 +11,8 @@ use std::thread;
 
 pub struct MemoryStatusItem;
 impl StatusItem for MemoryStatusItem {
-    fn check_available(&self) -> bool {
-        true
+    fn check_available(&self) -> Result<(), &str> {
+        Ok(())
     }
 
     fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>) {

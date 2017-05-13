@@ -2,7 +2,7 @@ use std::sync::mpsc;
 use components::status::StatusChange;
 
 pub trait StatusItem {
-    fn check_available(&self) -> bool;
+    fn check_available(&self) -> Result<(), &str>;
     fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>);
 }
 

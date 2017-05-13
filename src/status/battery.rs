@@ -12,8 +12,10 @@ use std::thread;
 
 pub struct BatteryStatusItem;
 impl StatusItem for BatteryStatusItem {
-    fn check_available(&self) -> bool {
-        File::open("/sys/class/power_supply/BAT1/capacity").is_ok()
+    fn check_available(&self) -> Result<(), &str> {
+        File::open("/sys/class/power_supply/BAT1/capacity")
+            .map(|_| ())
+            .map_err(|_| "Battery not found")
     }
 
     fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>) {

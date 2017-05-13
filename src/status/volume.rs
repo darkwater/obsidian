@@ -8,13 +8,13 @@ use std::thread;
 
 pub struct VolumeStatusItem;
 impl StatusItem for VolumeStatusItem {
-    fn check_available(&self) -> bool {
-        let mixer = alsa::mixer::Mixer::new("hw:3", true).expect("Mixer not found");
+    fn check_available(&self) -> Result<(), &str> {
+        let mixer = alsa::mixer::Mixer::new("hw:3", true).map_err(|_| "Mixer not found")?;
         let sid = alsa::mixer::SelemId::new("Speaker", 0);
-        let selem = mixer.find_selem(&sid).expect("Control not found");
+        let selem = mixer.find_selem(&sid).ok_or("Control not found")?;
         let has_volume = selem.has_volume();
 
-        has_volume
+        Ok(())
     }
 
     fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>) {

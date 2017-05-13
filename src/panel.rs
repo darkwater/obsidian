@@ -125,7 +125,7 @@ impl Panel {
 
         let mut first = true;
         for item in &status_items {
-            if !item.check_available() { continue }
+            if item.check_available().is_err() { continue }
 
             if first {
                 first = false
@@ -143,7 +143,7 @@ impl Panel {
 
         let mut first = true;
         for item in &extra_status_items {
-            if !item.check_available() { continue }
+            if item.check_available().is_err() { continue }
 
             if first {
                 first = false
