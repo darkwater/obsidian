@@ -253,6 +253,9 @@ impl Panel {
         let end_size;
         let end_opacity;
 
+        let scale_factor = self.window.get_window().unwrap().get_scale_factor();
+        let start_position = (start_position.0 / scale_factor, start_position.1 / scale_factor);
+
         match self.expanded {
             true => {
                 start_opacity = self.state_information.collapsed_opacity;
