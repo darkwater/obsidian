@@ -1,8 +1,10 @@
 extern crate gdk;
 extern crate gdk_sys;
+extern crate glib;
 extern crate gtk;
 
 use components::*;
+use self::glib::translate::ToGlibPtr;
 use gtk::prelude::*;
 use separator::{self, Separator};
 use status::*;
@@ -40,8 +42,9 @@ impl Panel {
             panic!("Failed to initialize GTK.");
         }
 
-        let window = gtk::Window::new(gtk::WindowType::Popup);
-        window.set_name("obsidian");
+        let window = gtk::Window::new(gtk::WindowType::Toplevel);
+        window.set_wmclass("obsidian", "obsidian");
+        window.set_title("obsidian");
         window.set_type_hint(gdk::WindowTypeHint::Dock);
         window.set_decorated(false);
 
@@ -90,6 +93,22 @@ impl Panel {
             let status = StatusComponent::new(item);
             container.add(&status.borrow().widget);
         }
+
+        window.connect_realize(|window| {
+            unsafe {
+                let gdk_window = window.get_window().unwrap().to_glib_none().0;
+                let type_ = gdk::Atom::intern("CARDINAL").to_glib_none().0;
+                let mode = gdk_sys::GdkPropMode::Replace;
+
+                let property = gdk::Atom::intern("_NET_WM_STRUT").to_glib_none().0;
+                let strut = (&[ 0, 0, 0, 25u64 ]).as_ptr() as *const u8;
+                gdk_sys::gdk_property_change(gdk_window, property, type_, 32, mode, strut, 4);
+
+                let property = gdk::Atom::intern("_NET_WM_STRUT_PARTIAL").to_glib_none().0;
+                let strut = (&[ 0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 1920, 3840u64 ]).as_ptr() as *const u8;
+                gdk_sys::gdk_property_change(gdk_window, property, type_, 32, mode, strut, 12);
+            }
+        });
 
         window.show_all();
         window.set_keep_above(true);
