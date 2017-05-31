@@ -199,8 +199,6 @@ impl WorkspacesComponent {
 
                 workspaces.sort();
 
-                println!("{:#?}", workspaces);
-
                 let capacity: i64 = minimum_workspaces_for_screen.iter().sum();
                 let mut result_workspaces = Vec::with_capacity(capacity as usize);
                 let mut last_screen = workspaces[0].screen;
@@ -225,6 +223,8 @@ impl WorkspacesComponent {
                                 position: None
                             });
                         }
+
+                        last_workspace = 0;
                     }
 
                     // Break if this is the end of the list
@@ -235,21 +235,19 @@ impl WorkspacesComponent {
                     let workspace = next.unwrap();
 
                     // Fill in missing workspaces between this and last
-                    if last_screen == workspace.screen {
-                        let position = screen_order[workspace.screen as usize - 1];
+                    let position = screen_order[workspace.screen as usize - 1];
 
-                        for n in (last_workspace + 1)..workspace.index {
-                            result_workspaces.push(Workspace {
-                                screen: workspace.screen,
-                                screen_position: position,
-                                index: n,
-                                phantom: true,
-                                visible: false,
-                                focused: false,
-                                urgent: false,
-                                position: None
-                            });
-                        }
+                    for n in (last_workspace + 1)..workspace.index {
+                        result_workspaces.push(Workspace {
+                            screen: workspace.screen,
+                            screen_position: position,
+                            index: n,
+                            phantom: true,
+                            visible: false,
+                            focused: false,
+                            urgent: false,
+                            position: None
+                        });
                     }
 
                     last_screen = workspace.screen;
