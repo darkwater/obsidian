@@ -1,8 +1,9 @@
-#![feature(range_contains)]
+#![feature(inclusive_range, inclusive_range_syntax, range_contains)]
 
 extern crate gdk;
 extern crate gdk_sys;
 extern crate gtk;
+extern crate i3ipc;
 extern crate time;
 
 #[macro_use]
