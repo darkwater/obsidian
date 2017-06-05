@@ -76,6 +76,13 @@ impl Panel {
         let workspaces = WorkspacesComponent::new();
         container.add(&workspaces.borrow().widget);
 
+        // TODO: Properly center music widget
+        let separator = Separator::new(separator::Type::Spacer);
+        container.add(&separator.borrow().widget);
+
+        let music = MusicComponent::new();
+        container.add(&music.borrow().widget);
+
         let separator = Separator::new(separator::Type::Spacer);
         container.add(&separator.borrow().widget);
 

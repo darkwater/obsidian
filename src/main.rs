@@ -5,6 +5,7 @@ extern crate gdk_sys;
 extern crate gtk;
 extern crate i3ipc;
 extern crate time;
+extern crate futures;
 
 #[macro_use]
 mod util;
