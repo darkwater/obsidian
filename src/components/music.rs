@@ -109,19 +109,20 @@ impl MusicComponent {
     }
 
     fn draw(&self, widget: &gtk::DrawingArea, context: &cairo::Context) -> gtk::Inhibit {
-        let width   = widget.get_allocated_width()  as f64;
-        let height  = widget.get_allocated_height() as f64;
-        let margin  = 12.0; // around widget
-        let padding = 10.0; // between icon and text
+        let width    = widget.get_allocated_width()  as f64;
+        let height   = widget.get_allocated_height() as f64;
+        let margin   = 12.0; // around widget
+        let padding  = 10.0; // between icon and text
 
         let icon = &self.icon;
         let text = &self.text;
 
         let mut used_width = margin;
 
+        let layout = pangocairo::create_layout(context);
+
         if icon != "" {
             let font = pango::FontDescription::from_string("Material Icons 12");
-            let layout = pangocairo::create_layout(context);
             layout.set_text(icon, icon.len() as i32);
             layout.set_font_description(Some(&font));
 
@@ -143,25 +144,28 @@ impl MusicComponent {
             used_width += icon_width + padding;
         }
 
-        // TODO: Use pango for this (and also for status later)
-
-        context.set_font_size(12.0);
-        context.select_font_face("Droid Sans Mono",
-                                 cairo::enums::FontSlant::Normal,
-                                 cairo::enums::FontWeight::Normal);
+        let font = pango::FontDescription::from_string("Droid Sans Mono 9");
+        layout.set_text(text, text.len() as i32);
+        layout.set_font_description(Some(&font));
 
         let available_space = width - used_width - margin;
-        let extents = context.text_extents(text);
-        let x = used_width + available_space / 2.0 - extents.width  / 2.0 - extents.x_bearing;
-        let y =              height          / 2.0 - extents.height / 2.0 - extents.y_bearing;
+        let extents = layout.get_extents().1;
+
+        let (text_x, text_y) = (extents.x as f64 / pango::SCALE as f64,
+                                extents.y as f64 / pango::SCALE as f64);
+        let (text_width, text_height) = (extents.width  as f64 / pango::SCALE as f64,
+                                         extents.height as f64 / pango::SCALE as f64);
+
+        let x = used_width + available_space / 2.0 - text_width  / 2.0 - text_x;
+        let y =                       height / 2.0 - text_height / 2.0 - text_y;
 
         let (r, g, b, a) = self.color;
         context.set_source_rgba(r, g, b, a);
 
         context.move_to(x, y);
-        context.show_text(text);
+        pangocairo::show_layout(&context, &layout);
 
-        used_width += extents.x_advance + margin;
+        used_width += text_width + margin;
 
         widget.set_size_request(used_width as i32, -1);
 
