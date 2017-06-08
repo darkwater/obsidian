@@ -1,9 +1,10 @@
-use std::sync::mpsc;
 use components::status::StatusChange;
+use config::Config;
+use std::sync::mpsc;
 
 pub trait StatusItem {
     fn check_available(&self) -> Result<(), &str>;
-    fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>);
+    fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>, &'static Config);
 }
 
 mod battery; pub use self::battery::BatteryStatusItem;

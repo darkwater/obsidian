@@ -5,6 +5,7 @@ extern crate gtk;
 extern crate gdk;
 extern crate gdk_sys;
 
+use config::{Color, Config};
 use gtk::prelude::*;
 use status::StatusItem;
 use std::cell::{Cell, RefCell};
@@ -16,14 +17,14 @@ pub struct StatusComponent {
     pub widget: gtk::DrawingArea,
     text: String,
     icon: String,
-    color: (f64, f64, f64, f64),
+    color: Color,
     size_request: Cell<SizeRequest>
 }
 
 pub enum StatusChange {
     Text(String),
     Icon(String),
-    Color((f64, f64, f64, f64)),
+    Color(Color),
     Size(SizeRequest)
 }
 
@@ -35,7 +36,7 @@ pub enum SizeRequest {
 }
 
 impl StatusComponent {
-    pub fn new(status_item: &Box<StatusItem>) -> Rc<RefCell<Self>>
+    pub fn new(status_item: &Box<StatusItem>, config: &'static Config) -> Rc<RefCell<Self>>
     {
         let widget = gtk::DrawingArea::new();
         widget.set_size_request(10, -1);
@@ -45,7 +46,7 @@ impl StatusComponent {
             widget: widget,
             text: String::new(),
             icon: String::new(),
-            color: (0.0, 0.0, 0.0, 0.0),
+            color: Color::default(),
             size_request: Cell::new(SizeRequest::Keep)
         }));
 
@@ -64,7 +65,7 @@ impl StatusComponent {
         let (sx, rx) = mpsc::channel::<Vec<StatusChange>>();
         let update_fn = status_item.get_update_fun();
 
-        thread::spawn(move || update_fn(sx));
+        thread::spawn(move || update_fn(sx, config));
 
         gtk::timeout_add(50, clone!(status_component => move || {
             if let Ok(changes) = rx.try_recv() {
@@ -114,7 +115,7 @@ impl StatusComponent {
             let x = -icon_x as f64 + margin;
             let y = -icon_y as f64 + height / 2.0 - icon_height / 2.0;
 
-            let (r, g, b, a) = self.color;
+            let Color(r, g, b, a) = self.color;
             context.set_source_rgba(r, g, b, a);
 
             context.move_to(x, y);
@@ -133,7 +134,7 @@ impl StatusComponent {
         let x = used_width + available_space / 2.0 - extents.width  / 2.0 - extents.x_bearing;
         let y =              height          / 2.0 - extents.height / 2.0 - extents.y_bearing;
 
-        let (r, g, b, a) = self.color;
+        let Color(r, g, b, a) = self.color;
         context.set_source_rgba(r, g, b, a);
 
         context.move_to(x, y);

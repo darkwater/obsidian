@@ -4,13 +4,13 @@ extern crate glib;
 extern crate gtk;
 
 use components::*;
-use self::glib::translate::ToGlibPtr;
+use config::Config;
 use gtk::prelude::*;
+use self::glib::translate::ToGlibPtr;
 use separator::{self, Separator};
 use status::*;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use std::time::{Duration, Instant};
 
 pub struct Panel {
     opacity:           Rc<Cell<f64>>,
@@ -22,17 +22,17 @@ enum PanelMsg {
 }
 
 impl Panel {
-    pub fn new() -> Rc<RefCell<Self>> {
+    pub fn new(config: &'static Config) -> Rc<RefCell<Self>> {
         let items = vec![ "volume", "memory", "load", "battery", "clock" ];
 
-        let status_items: Vec<_> = items.iter().map(|item| {
-            let item: Box<StatusItem> = match *item {
+        let status_items: Vec<_> = items.into_iter().map(|item| {
+            let item: Box<StatusItem> = match item {
                 "battery" => Box::new(BatteryStatusItem),
                 "clock"   => Box::new(ClockStatusItem),
                 "load"    => Box::new(LoadStatusItem),
                 "memory"  => Box::new(MemoryStatusItem),
                 "volume"  => Box::new(VolumeStatusItem),
-                _         => unreachable!()
+                other     => panic!("unknown status component {:#?}", other)
             };
 
             item
@@ -80,7 +80,7 @@ impl Panel {
         let separator = Separator::new(separator::Type::Spacer);
         container.add(&separator.borrow().widget);
 
-        let music = MusicComponent::new();
+        let music = MusicComponent::new(config);
         container.add(&music.borrow().widget);
 
         let separator = Separator::new(separator::Type::Spacer);
@@ -97,7 +97,7 @@ impl Panel {
                 container.add(&separator.borrow().widget);
             }
 
-            let status = StatusComponent::new(item);
+            let status = StatusComponent::new(item, config);
             container.add(&status.borrow().widget);
         }
 

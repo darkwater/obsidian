@@ -1,6 +1,7 @@
 extern crate time;
 
 use components::*;
+use config::Config;
 use status::StatusItem;
 use std::fs::File;
 use std::io::BufReader;
@@ -15,8 +16,8 @@ impl StatusItem for MemoryStatusItem {
         Ok(())
     }
 
-    fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>) {
-        fn fun(sx: mpsc::Sender<Vec<StatusChange>>) {
+    fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>, &'static Config) {
+        fn fun(sx: mpsc::Sender<Vec<StatusChange>>, config: &'static Config) {
             let changes = vec![
                 StatusChange::Icon("memory".to_string()),
             ];
@@ -42,10 +43,10 @@ impl StatusItem for MemoryStatusItem {
                 let text = format!("{}%", mem_usage);
 
                 let color = match mem_usage {
-                    0...20 => (0.2, 1.0, 0.5, 0.95),
-                   21...40 => (0.1, 1.0, 0.1, 0.95),
-                   41...85 => (1.0, 0.7, 0.0, 0.95),
-                   _       => (1.0, 0.3, 0.1, 0.95),
+                    0...20 => config.get_color("blue"),
+                   21...40 => config.get_color("green"),
+                   41...85 => config.get_color("yellow"),
+                   _       => config.get_color("red"),
                 };
 
                 let changes = vec![

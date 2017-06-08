@@ -6,17 +6,12 @@ extern crate i3ipc;
 extern crate time;
 
 use gtk::prelude::*;
-use i3ipc::event::Event;
-use i3ipc::I3EventListener;
-use i3ipc::Subscription;
+use i3ipc::{I3EventListener, Subscription};
 use std::cell::RefCell;
-use std::io::{BufReader, BufRead};
-use std::cmp;
+use std::{cmp, thread};
 use std::ops::Range;
-use std::process::{Command, Stdio};
 use std::rc::Rc;
 use std::sync::mpsc::channel;
-use std::thread;
 
 // Good luck working with this code, future me! (Or poor lost soul who stumbled upon this file.)
 // I gave up keeping the code nice and clean about halfway converting obsidian from bspwm to i3
@@ -261,7 +256,7 @@ impl WorkspacesComponent {
                 let _ = sx.send(Message::Workspaces(result_workspaces));
 
                 if let Some(Err(_)) = listener.next() {
-                    sx.send(Message::Quit);
+                    let _ = sx.send(Message::Quit);
                 }
             }
         });

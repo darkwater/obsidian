@@ -1,6 +1,7 @@
 extern crate time;
 
 use components::*;
+use config::Config;
 use status::StatusItem;
 use std::fs::File;
 use std::io::BufReader;
@@ -15,8 +16,8 @@ impl StatusItem for LoadStatusItem {
         Ok(())
     }
 
-    fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>) {
-        fn fun(sx: mpsc::Sender<Vec<StatusChange>>) {
+    fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>, &'static Config) {
+        fn fun(sx: mpsc::Sender<Vec<StatusChange>>, config: &'static Config) {
             let changes = vec![
                 StatusChange::Icon("equalizer".to_string()),
             ];
@@ -45,10 +46,10 @@ impl StatusItem for LoadStatusItem {
                 let text = format!("{:.2}", loadavg);
 
                 let color = match normalized_loadavg {
-                    0.0...0.1 => (0.2, 1.0, 0.5, 0.95),
-                    0.1...0.4 => (0.1, 1.0, 0.1, 0.95),
-                    0.4...0.8 => (1.0, 0.7, 0.0, 0.95),
-                    _         => (1.0, 0.3, 0.1, 0.95),
+                    0.0...0.1 => config.get_color("blue"),
+                    0.1...0.4 => config.get_color("green"),
+                    0.4...0.8 => config.get_color("yellow"),
+                    _         => config.get_color("red"),
                 };
 
                 let changes = vec![

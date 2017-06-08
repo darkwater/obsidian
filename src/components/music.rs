@@ -6,9 +6,11 @@ extern crate mpd;
 extern crate pango;
 extern crate pangocairo;
 
+use config::{Color, Config};
 use gtk::prelude::*;
 use self::mpd::Idle;
 use std::cell::{Cell, RefCell};
+use std::default::Default;
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
@@ -17,17 +19,16 @@ pub struct MusicComponent {
     pub widget: gtk::DrawingArea,
     text: String,
     icon: String,
-    color: (f64, f64, f64, f64),
+    color: Color,
 }
 
 enum MpdMessage {
     Text(String),
-    Color((f64, f64, f64, f64)),
+    Color(Color),
 }
 
 impl MusicComponent {
-    pub fn new() -> Rc<RefCell<Self>>
-    {
+    pub fn new(config: &'static Config) -> Rc<RefCell<Self>> {
         let widget = gtk::DrawingArea::new();
         widget.set_size_request(10, -1);
         widget.set_vexpand(true);
@@ -36,7 +37,7 @@ impl MusicComponent {
             widget: widget,
             text: String::new(),
             icon: String::new(),
-            color: (0.9, 0.9, 0.9, 0.9),
+            color: Color::default(),
         }));
 
         {
@@ -72,8 +73,8 @@ impl MusicComponent {
                         }
 
                         let color = match state {
-                            Play  => (0.72, 0.84, 0.55, 1.0),
-                            Pause => (0.88, 0.67, 0.36, 1.0),
+                            Play  => config.get_color("green"),
+                            Pause => config.get_color("yellow"),
                             _     => unreachable!()
                         };
 
@@ -135,7 +136,7 @@ impl MusicComponent {
             let x = -icon_x as f64 + margin;
             let y = -icon_y as f64 + height / 2.0 - icon_height / 2.0;
 
-            let (r, g, b, a) = self.color;
+            let Color(r, g, b, a) = self.color;
             context.set_source_rgba(r, g, b, a);
 
             context.move_to(x, y);
@@ -159,7 +160,7 @@ impl MusicComponent {
         let x = used_width + available_space / 2.0 - text_width  / 2.0 - text_x;
         let y =                       height / 2.0 - text_height / 2.0 - text_y;
 
-        let (r, g, b, a) = self.color;
+        let Color(r, g, b, a) = self.color;
         context.set_source_rgba(r, g, b, a);
 
         context.move_to(x, y);

@@ -1,6 +1,7 @@
 extern crate time;
 
 use components::*;
+use config::Config;
 use status::StatusItem;
 use std::fs::File;
 use std::io::BufReader;
@@ -18,27 +19,13 @@ impl StatusItem for BatteryStatusItem {
             .map_err(|_| "Battery not found")
     }
 
-    fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>) {
-        fn fun(sx: mpsc::Sender<Vec<StatusChange>>) {
+    fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>, &'static Config) {
+        fn fun(sx: mpsc::Sender<Vec<StatusChange>>, config: &'static Config) {
             let changes = vec![
                 StatusChange::Icon("battery_full".to_string()),
             ];
 
             let _ = sx.send(changes);
-
-            fn determine_color(capacity: i8, charging: bool) -> (f64, f64, f64, f64) {
-                if charging {
-                    (0.1, 0.7, 1.0, 0.95)
-                } else {
-                    match capacity {
-                         0... 15 => (1.0, 0.2, 0.0, 0.95),
-                        16... 40 => (1.0, 0.7, 0.0, 0.95),
-                        41... 80 => (0.1, 1.0, 0.1, 0.95),
-                        81...100 => (0.2, 1.0, 0.5, 0.95),
-                        _        => (1.0, 1.0, 1.0, 0.95),
-                    }
-                }
-            }
 
             enum BatteryChange {
                 Capacity(i8),
@@ -95,34 +82,35 @@ impl StatusItem for BatteryStatusItem {
 
             loop {
                 if let Ok(change) = bat_rx.try_recv() {
+                    let mut changes = vec![];
+
                     match change {
                         BatteryChange::Capacity(new_cap) => {
                             capacity = new_cap;
 
                             let text = format!("{}%", capacity);
-                            let color = determine_color(capacity, charging);
-
-                            let changes = vec![
-                                StatusChange::Text(text),
-                                StatusChange::Color(color),
-                                StatusChange::Size(SizeRequest::Expand),
-                            ];
-
-                            let _ = sx.send(changes);
+                            changes.push(StatusChange::Text(text));
                         },
                         BatteryChange::Charging(new_charge) => {
                             charging = new_charge;
-
-                            let color = determine_color(capacity, charging);
-
-                            let changes = vec![
-                                StatusChange::Color(color),
-                                StatusChange::Size(SizeRequest::Expand),
-                            ];
-
-                            let _ = sx.send(changes);
                         }
                     }
+
+                    let color = if charging {
+                        config.get_color("blue")
+                    } else {
+                        match capacity {
+                             0... 15 => config.get_color("red"),
+                            16... 40 => config.get_color("yellow"),
+                            41...100 => config.get_color("green"),
+                            _        => panic!("battery capacity outside range 0..100")
+                        }
+                    };
+
+                    changes.push(StatusChange::Color(color));
+                    changes.push(StatusChange::Size(SizeRequest::Expand));
+
+                    let _ = sx.send(changes);
                 }
 
                 let sleep_time = ::std::time::Duration::from_millis(50);

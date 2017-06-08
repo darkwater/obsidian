@@ -2,6 +2,7 @@ extern crate time;
 extern crate alsa;
 
 use components::*;
+use config::Config;
 use status::StatusItem;
 use std::sync::mpsc;
 use std::thread;
@@ -17,8 +18,8 @@ impl StatusItem for VolumeStatusItem {
         Ok(())
     }
 
-    fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>) {
-        fn fun(sx: mpsc::Sender<Vec<StatusChange>>) {
+    fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>, &'static Config) {
+        fn fun(sx: mpsc::Sender<Vec<StatusChange>>, config: &'static Config) {
             let changes = vec![
                 StatusChange::Icon("volume_up".to_string()),
             ];
@@ -35,7 +36,12 @@ impl StatusItem for VolumeStatusItem {
 
                 let text = format!("{:.0}%", volume_percent);
 
-                let color = (0.2, 1.0, 0.5, 0.95);
+                let color = match volume_percent {
+                    0...20 => config.get_color("blue"),
+                   21...40 => config.get_color("green"),
+                   41...85 => config.get_color("yellow"),
+                   _       => config.get_color("red"),
+                };
 
                 let changes = vec![
                     StatusChange::Text(text),
