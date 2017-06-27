@@ -12,6 +12,7 @@ use self::glib::translate::ToGlibPtr;
 use separator::{self, Separator};
 use status::*;
 use std::cell::{Cell, RefCell};
+use std::process::Command;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -21,13 +22,24 @@ pub struct PanelModel {
 
 #[derive(Msg)]
 pub enum PanelMsg {
-    Quit
+    Command(String),
+    Quit,
 }
 
 #[derive(Clone)]
 pub struct Panel {
     window:       gtk::Window,
     status_items: Rc<Vec<Box<StatusItem>>>,
+}
+
+impl Panel {
+    fn run_cmd(&self, cmd: String) {
+        let _ = Command::new("/bin/bash")
+            .arg("-c")
+            .arg(cmd)
+            .spawn()
+            .expect("failed to execute child");
+    }
 }
 
 impl Widget for Panel {
@@ -135,6 +147,28 @@ impl Widget for Panel {
         window.show_all();
         window.set_keep_above(true);
 
+        let stream = relm.stream().clone();
+        let config = model.config;
+        window.connect_button_release_event(move |widget, event| {
+            let width = widget.get_allocated_width() as f64;
+            let (mouse_x, _mouse_y) = event.get_position();
+
+            let command = match mouse_x / width * 3.0 {
+                0.0...1.0 => config.launch.left.clone(),
+                1.0...2.0 => config.launch.middle.clone(),
+                2.0...3.0 => config.launch.right.clone(),
+                _         => None
+            }.map(PanelMsg::Command);
+
+            match command {
+                Some(cmd) => {
+                    stream.emit(cmd);
+                    Inhibit(true)
+                },
+                None => Inhibit(false)
+            }
+        });
+
         window.connect_draw(|widget, cx| {
             let width  = widget.get_allocated_width()  as f64;
             let height = widget.get_allocated_height() as f64;
@@ -160,7 +194,8 @@ impl Widget for Panel {
     fn update(&mut self, msg: Self::Msg, model: &mut Self::Model) {
         use self::PanelMsg::*;
         match msg {
-            Quit => gtk::main_quit(),
+            Command(cmd) => self.run_cmd(cmd),
+            Quit         => gtk::main_quit(),
         }
     }
 }

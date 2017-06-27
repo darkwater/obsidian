@@ -46,11 +46,18 @@ impl FromStr for Color {
 pub struct Config {
     pub colors: HashMap<String, Color>,
     pub mpd:    MpdConfig,
+    pub launch: LaunchConfig,
 }
 
 pub struct MpdConfig {
     pub host: String,
     pub port: u16,
+}
+
+pub struct LaunchConfig {
+    pub left:   Option<String>,
+    pub middle: Option<String>,
+    pub right:  Option<String>,
 }
 
 impl Config {
@@ -69,24 +76,27 @@ impl Config {
     }
 
     pub fn parse_rsconfig(config: rsconfig::Config) -> Self {
-        // We can unwrap the Options here because the default config should contain everything.
-        // We only need to handle invalid values because defaults can be overridden.
-
         let colors = config.get_table("colors").unwrap().into_iter().map(|(name, color)| {
             let errmsg = format!("invalid color {:?}", color);
 
-            let color = color.into_str().expect(&errmsg);
+            let color = color.into_str().unwrap();
             (name, color.parse().expect(&errmsg))
         }).collect();
 
-        let mut mpd = config.get_table("mpd").unwrap();
+        let mut mpd    = config.get_table("mpd").unwrap();
+        let mut launch = config.get_table("launch").unwrap();
 
         Self {
+            mpd: MpdConfig {
+                host: mpd.remove("host").unwrap().try_into().unwrap(),
+                port: mpd.remove("port").unwrap().try_into().unwrap(),
+            },
+            launch: LaunchConfig {
+                left:   launch.remove("left").map(|c| c.try_into().unwrap()),
+                middle: launch.remove("middle").map(|c| c.try_into().unwrap()),
+                right:  launch.remove("right").map(|c| c.try_into().unwrap()),
+            },
             colors: colors,
-            mpd:    MpdConfig {
-                host: mpd.remove("host").unwrap().try_into().expect("invalid mpd host"),
-                port: mpd.remove("port").unwrap().try_into().expect("invalid mpd port"),
-            }
         }
     }
 
