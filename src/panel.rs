@@ -61,10 +61,8 @@ impl Widget for Panel {
     }
 
     fn view(relm: &RemoteRelm<Self>, model: &Self::Model) -> Self {
-        let items = vec![ "volume", "memory", "load", "battery", "clock" ];
-
-        let status_items: Vec<_> = items.into_iter().map(|item| {
-            let item: Box<StatusItem> = match item {
+        let status_items: Vec<_> = model.config.status_items.iter().map(|item| {
+            let item: Box<StatusItem> = match item.as_str() {
                 "battery" => Box::new(BatteryStatusItem),
                 "clock"   => Box::new(ClockStatusItem),
                 "load"    => Box::new(LoadStatusItem),

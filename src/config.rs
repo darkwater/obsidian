@@ -44,9 +44,10 @@ impl FromStr for Color {
 }
 
 pub struct Config {
-    pub colors: HashMap<String, Color>,
-    pub mpd:    MpdConfig,
-    pub launch: LaunchConfig,
+    pub colors:       HashMap<String, Color>,
+    pub status_items: Vec<String>,
+    pub mpd:          MpdConfig,
+    pub launch:       LaunchConfig,
 }
 
 pub struct MpdConfig {
@@ -83,10 +84,15 @@ impl Config {
             (name, color.parse().expect(&errmsg))
         }).collect();
 
+        let status_items = config.get_array("status_items").unwrap().into_iter()
+            .map(Value::into_str).map(Result::unwrap).collect();
+
         let mut mpd    = config.get_table("mpd").unwrap();
         let mut launch = config.get_table("launch").unwrap();
 
         Self {
+            colors: colors,
+            status_items: status_items,
             mpd: MpdConfig {
                 host: mpd.remove("host").unwrap().try_into().unwrap(),
                 port: mpd.remove("port").unwrap().try_into().unwrap(),
@@ -96,7 +102,6 @@ impl Config {
                 middle: launch.remove("middle").map(|c| c.try_into().unwrap()),
                 right:  launch.remove("right").map(|c| c.try_into().unwrap()),
             },
-            colors: colors,
         }
     }
 
