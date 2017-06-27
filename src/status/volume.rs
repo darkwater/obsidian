@@ -10,12 +10,15 @@ use std::thread;
 pub struct VolumeStatusItem;
 impl StatusItem for VolumeStatusItem {
     fn check_available(&self) -> Result<(), &str> {
-        let mixer = alsa::mixer::Mixer::new("hw:3", true).map_err(|_| "Mixer not found")?;
-        let sid = alsa::mixer::SelemId::new("Speaker", 0);
+        let mixer = alsa::mixer::Mixer::new("hw:0", true).map_err(|_| "Mixer not found")?;
+        let sid = alsa::mixer::SelemId::new("Master", 0);
         let selem = mixer.find_selem(&sid).ok_or("Control not found")?;
         let has_volume = selem.has_volume();
 
-        Ok(())
+        match has_volume {
+            true  => Ok(()),
+            false => Err("Specified control has no volume control"),
+        }
     }
 
     fn get_update_fun(&self) -> fn(mpsc::Sender<Vec<StatusChange>>, &'static Config) {
@@ -27,8 +30,8 @@ impl StatusItem for VolumeStatusItem {
             let _ = sx.send(changes);
 
             loop {
-                let mixer = alsa::mixer::Mixer::new("hw:3", true).expect("Mixer not found");
-                let sid = alsa::mixer::SelemId::new("Speaker", 0);
+                let mixer = alsa::mixer::Mixer::new("hw:0", true).expect("Mixer not found");
+                let sid = alsa::mixer::SelemId::new("Master", 0);
                 let selem = mixer.find_selem(&sid).expect("Control not found");
                 let volume_range = selem.get_playback_volume_range();
                 let volume = selem.get_playback_volume(alsa::mixer::SelemChannelId::FrontLeft).expect("Control has no volume range");

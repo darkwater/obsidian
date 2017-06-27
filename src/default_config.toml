@@ -1,0 +1,21 @@
+[music]
+address = "127.0.0.1"
+port    = 6600
+
+[colors]
+grey          = "#101010"
+red           = "#e84f4f"
+green         = "#b8d68c"
+yellow        = "#e1aa5d"
+blue          = "#7dc1cf"
+magenta       = "#9b64fb"
+cyan          = "#6d878d"
+white         = "#dfdfdf"
+brightgrey    = "#404040"
+brightred     = "#d23d3d"
+brightgreen   = "#a0cf5d"
+brightyellow  = "#f39d21"
+brightblue    = "#4e9fb1"
+brightmagenta = "#8542ff"
+brightcyan    = "#42717b"
+brightwhite   = "#ffffff"

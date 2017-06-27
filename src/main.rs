@@ -7,10 +7,10 @@ extern crate gtk;
 extern crate i3ipc;
 extern crate leak;
 extern crate time;
+#[macro_use] extern crate relm;
+#[macro_use] extern crate relm_derive;
 
-#[macro_use]
-mod util;
-
+#[macro_use] mod util;
 mod components;
 mod config;
 mod panel;
@@ -24,7 +24,5 @@ use panel::Panel;
 fn main() {
     let config = Box::new(Config::default()).leak();
 
-    let _panel = Panel::new(config);
-
-    gtk::main();
+    relm::run::<Panel>(Some(config)).unwrap();
 }

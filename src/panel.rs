@@ -5,24 +5,50 @@ extern crate gtk;
 
 use components::*;
 use config::Config;
+use gtk::{Builder, Inhibit};
 use gtk::prelude::*;
+use relm::{Relm, RemoteRelm, Widget};
 use self::glib::translate::ToGlibPtr;
 use separator::{self, Separator};
 use status::*;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+#[derive(Clone)]
+pub struct PanelModel {
+    config: &'static Config
+}
+
+#[derive(Msg)]
+pub enum PanelMsg {
+    Quit
+}
+
+#[derive(Clone)]
 pub struct Panel {
-    opacity:           Rc<Cell<f64>>,
-    status_items:      Vec<Box<StatusItem>>,
-    window:            gtk::Window,
+    window:       gtk::Window,
+    status_items: Rc<Vec<Box<StatusItem>>>,
 }
 
-enum PanelMsg {
-}
+impl Widget for Panel {
+    type Model = PanelModel;
+    type ModelParam = Option<&'static Config>;
+    type Msg = PanelMsg;
+    type Root = gtk::Window;
 
-impl Panel {
-    pub fn new(config: &'static Config) -> Rc<RefCell<Self>> {
+    // Return the initial model.
+    fn model(config: Self::ModelParam) -> Self::Model {
+        Self::Model {
+            config: config.unwrap()
+        }
+    }
+
+    // Return the root of this widget.
+    fn root(&self) -> &Self::Root {
+        &self.window
+    }
+
+    fn view(relm: &RemoteRelm<Self>, model: &Self::Model) -> Self {
         let items = vec![ "volume", "memory", "load", "battery", "clock" ];
 
         let status_items: Vec<_> = items.into_iter().map(|item| {
@@ -38,15 +64,10 @@ impl Panel {
             item
         }).collect();
 
-        if gtk::init().is_err() {
-            panic!("Failed to initialize GTK.");
-        }
+        let builder = Builder::new();
+        let _ = builder.add_from_string(include_str!("panel.glade"));
 
-        let window = gtk::Window::new(gtk::WindowType::Toplevel);
-        window.set_wmclass("obsidian", "obsidian");
-        window.set_title("obsidian");
-        window.set_type_hint(gdk::WindowTypeHint::Dock);
-        window.set_decorated(false);
+        let window: gtk::Window = builder.get_object("window").unwrap();
 
         let screen = window.get_screen().unwrap();
         let monitor_id = screen.get_primary_monitor();
@@ -70,21 +91,15 @@ impl Panel {
         // topw.property_change("_NET_WM_STRUT_PARTIAL","CARDINAL",32,gtk.gdk.PROP_MODE_REPLACE,
         //                      [0, 0, bar_size, 0, 0, 0, 0, 0, x, x+width, 0, 0])
 
-        let container = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        window.add(&container);
+        let cont_workspaces: gtk::Container = builder.get_object("container-workspaces").unwrap();
+        let cont_music:      gtk::Container = builder.get_object("container-music").unwrap();
+        let cont_status:     gtk::Container = builder.get_object("container-status").unwrap();
 
         let workspaces = WorkspacesComponent::new();
-        container.add(&workspaces.borrow().widget);
+        cont_workspaces.add(&workspaces.borrow().widget);
 
-        // TODO: Properly center music widget
-        let separator = Separator::new(separator::Type::Spacer);
-        container.add(&separator.borrow().widget);
-
-        let music = MusicComponent::new(config);
-        container.add(&music.borrow().widget);
-
-        let separator = Separator::new(separator::Type::Spacer);
-        container.add(&separator.borrow().widget);
+        let music = MusicComponent::new(model.config);
+        cont_music.add(&music.borrow().widget);
 
         let mut first = true;
         for item in &status_items {
@@ -93,12 +108,12 @@ impl Panel {
             if first {
                 first = false
             } else {
-                let separator = Separator::new(separator::Type::Visual(1));
-                container.add(&separator.borrow().widget);
+                let separator = Separator::new();
+                cont_status.add(&separator);
             }
 
-            let status = StatusComponent::new(item, config);
-            container.add(&status.borrow().widget);
+            let status = StatusComponent::new(item, model.config);
+            cont_status.add(&status.borrow().widget);
         }
 
         window.connect_realize(|window| {
@@ -120,49 +135,32 @@ impl Panel {
         window.show_all();
         window.set_keep_above(true);
 
-        let panel = Rc::new(RefCell::new(Panel {
-            opacity:           Rc::new(Cell::new(0.92)),
-            status_items:      status_items,
-            window:            window,
-        }));
+        window.connect_draw(|widget, cx| {
+            let width  = widget.get_allocated_width()  as f64;
+            let height = widget.get_allocated_height() as f64;
 
-        {
-            let ref window = panel.borrow().window;
+            let (r, g, b, a) = (0.11, 0.12, 0.13, 0.92);
+            cx.set_source_rgba(r, g, b, a);
+            cx.rectangle(0.0, 0.0, width, height);
+            cx.fill();
 
-            window.connect_button_release_event(clone!(panel => move |_, event| {
-                match event.get_button() {
-                    // 3 => panel.borrow_mut().update(PanelMsg::ToggleExpand),
-                    _ => ()
-                }
-                Inhibit(false)
-            }));
+            Inhibit(false)
+        });
 
-            window.connect_draw(clone!(panel => move |widget, cx| {
-                let width  = widget.get_allocated_width()  as f64;
-                let height = widget.get_allocated_height() as f64;
+        connect!(relm, window, connect_delete_event(_, _) (PanelMsg::Quit, Inhibit(false)));
 
-                let panel = panel.borrow();
-                let (r, g, b, a) = (0.11, 0.12, 0.13, panel.opacity.get());
-                cx.set_source_rgba(r, g, b, a);
-                cx.rectangle(0.0, 0.0, width, height);
-                cx.fill();
-
-                Inhibit(false)
-            }));
-
-            window.connect_delete_event(|_, _| {
-                gtk::main_quit();
-                Inhibit(false)
-            });
-        }
+        let panel = Panel {
+            status_items: Rc::new(status_items),
+            window:       window,
+        };
 
         panel
     }
 
-    fn update(&mut self, msg: PanelMsg) {
+    fn update(&mut self, msg: Self::Msg, model: &mut Self::Model) {
         use self::PanelMsg::*;
         match msg {
-            // ToggleExpand => self.toggle_expand()
+            Quit => gtk::main_quit(),
         }
     }
 }

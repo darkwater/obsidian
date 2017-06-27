@@ -53,6 +53,7 @@ impl Config {
         config_path.push(".config/obsidian/config.toml");
 
         let mut config = rsconfig::Config::new();
+        let _ = config.merge(rsconfig::File::from_str(include_str!("default_config.toml"), rsconfig::FileFormat::Toml).required(true));
         let _ = config.merge(rsconfig::File::new(config_path.to_str().unwrap(), rsconfig::FileFormat::Toml).required(true));
 
         Self::parse_rsconfig(config)
