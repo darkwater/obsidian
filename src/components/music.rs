@@ -55,7 +55,7 @@ impl MusicComponent {
         let (sx, rx) = mpsc::channel::<Vec<MpdMessage>>();
 
         thread::spawn(move || {
-            let mut conn = mpd::Client::connect("127.0.0.1:6600").unwrap();
+            let mut conn = mpd::Client::connect((config.mpd.host.as_str(), config.mpd.port)).unwrap();
             loop {
                 use self::mpd::State::*;
                 match conn.status().unwrap().state {

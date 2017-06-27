@@ -1,5 +1,6 @@
 extern crate config as rsconfig;
 
+use self::rsconfig::Value;
 use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
@@ -42,31 +43,50 @@ impl FromStr for Color {
     }
 }
 
-#[derive(Debug)]
 pub struct Config {
     pub colors: HashMap<String, Color>,
+    pub mpd:    MpdConfig,
+}
+
+pub struct MpdConfig {
+    pub host: String,
+    pub port: u16,
 }
 
 impl Config {
     pub fn default() -> Self {
+        let mut config = rsconfig::Config::new();
         let mut config_path = PathBuf::from(env::var("HOME").unwrap_or(".".to_string()));
         config_path.push(".config/obsidian/config.toml");
 
-        let mut config = rsconfig::Config::new();
-        let _ = config.merge(rsconfig::File::from_str(include_str!("default_config.toml"), rsconfig::FileFormat::Toml).required(true));
-        let _ = config.merge(rsconfig::File::new(config_path.to_str().unwrap(), rsconfig::FileFormat::Toml).required(true));
+        let _ = config.merge(rsconfig::File::from_str(include_str!("default_config.toml"), rsconfig::FileFormat::Toml)
+                             .required(true));
+
+        let _ = config.merge(rsconfig::File::new(config_path.to_str().unwrap(), rsconfig::FileFormat::Toml)
+                             .required(false));
 
         Self::parse_rsconfig(config)
     }
 
     pub fn parse_rsconfig(config: rsconfig::Config) -> Self {
-        let colors = config.get_table("colors").expect("no colors defined").into_iter().map(|(name, color)| {
-            let color = color.into_str().expect("invalid color");
-            (name, color.parse().expect("invalid color"))
+        // We can unwrap the Options here because the default config should contain everything.
+        // We only need to handle invalid values because defaults can be overridden.
+
+        let colors = config.get_table("colors").unwrap().into_iter().map(|(name, color)| {
+            let errmsg = format!("invalid color {:?}", color);
+
+            let color = color.into_str().expect(&errmsg);
+            (name, color.parse().expect(&errmsg))
         }).collect();
 
+        let mut mpd = config.get_table("mpd").unwrap();
+
         Self {
-            colors: colors
+            colors: colors,
+            mpd:    MpdConfig {
+                host: mpd.remove("host").unwrap().try_into().expect("invalid mpd host"),
+                port: mpd.remove("port").unwrap().try_into().expect("invalid mpd port"),
+            }
         }
     }
 
