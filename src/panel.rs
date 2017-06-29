@@ -148,8 +148,14 @@ impl Widget for Panel {
         let stream = relm.stream().clone();
         let config = model.config;
         window.connect_button_release_event(move |widget, event| {
-            let width = widget.get_allocated_width() as f64;
-            let (mouse_x, _mouse_y) = event.get_position();
+            if event.get_button() != 3 { return Inhibit(false) }
+
+            let width  = widget.get_allocated_width() as f64;
+            let height = widget.get_allocated_width() as f64;
+
+            let (mouse_x, mouse_y) = event.get_position();
+
+            if mouse_y < 0.0 || mouse_y > height { return Inhibit(false) }
 
             let command = match mouse_x / width * 3.0 {
                 0.0...1.0 => config.launch.left.clone(),
