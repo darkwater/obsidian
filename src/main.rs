@@ -1,28 +1,25 @@
-#![feature(inclusive_range_syntax, range_contains)]
+#![feature(refcell_replace_swap, range_contains)]
 
-extern crate futures;
-extern crate gdk;
-extern crate gdk_sys;
-extern crate gtk;
-extern crate i3ipc;
-extern crate leak;
-extern crate time;
 #[macro_use] extern crate relm;
 #[macro_use] extern crate relm_derive;
+extern crate gdk;
+extern crate gdk_sys;
+extern crate glib;
+extern crate gtk;
+extern crate i3ipc;
+
+extern crate time;
 
 #[macro_use] mod util;
-mod components;
 mod config;
 mod panel;
-mod separator;
-mod status;
+mod components;
 
 use config::Config;
-use leak::Leak;
 use panel::Panel;
 
 fn main() {
-    let config = Box::new(Config::default()).leak();
+    let config = Config::default();
 
-    relm::run::<Panel>(Some(config)).unwrap();
+    relm::run::<Panel>(config).unwrap();
 }

@@ -1,23 +1,21 @@
 extern crate gdk;
-extern crate gdk_sys;
-extern crate glib;
 extern crate gtk;
+extern crate relm;
 
-use components::*;
-use config::Config;
-use gtk::{Builder, Inhibit};
-use gtk::prelude::*;
-use relm::{Relm, RemoteRelm, Widget};
-use self::glib::translate::ToGlibPtr;
-use separator::{self, Separator};
-use status::*;
 use std::cell::{Cell, RefCell};
 use std::process::Command;
 use std::rc::Rc;
 
-#[derive(Clone)]
+use config::Config;
+use gdk::prelude::*;
+use gtk::Inhibit;
+use gtk::prelude::*;
+use relm::{Component, ContainerWidget, Relm, Update, Widget};
+
+use ::components::workspace::WorkspaceComponent;
+
 pub struct PanelModel {
-    config: &'static Config
+    config: Config
 }
 
 #[derive(Msg)]
@@ -26,58 +24,58 @@ pub enum PanelMsg {
     Quit,
 }
 
-#[derive(Clone)]
 pub struct Panel {
-    window:       gtk::Window,
-    status_items: Rc<Vec<Box<StatusItem>>>,
+    window:              gtk::Window,
+    workspace_component: Component<WorkspaceComponent>,
 }
 
 impl Panel {
-    fn run_cmd(&self, cmd: String) {
+    fn run_cmd(&self, mut cmd: String) {
+        cmd.push('&');
         let _ = Command::new("/bin/bash")
             .arg("-c")
             .arg(cmd)
             .spawn()
-            .expect("failed to execute child");
+            .expect("failed to execute child")
+            .wait();
+    }
+}
+
+impl Update for Panel {
+    type Model = PanelModel;
+    type ModelParam = Config;
+    type Msg = PanelMsg;
+
+    // Return the initial model.
+    fn model(_: &Relm<Self>, param: Self::ModelParam) -> Self::Model {
+        Self::Model {
+            config: param
+        }
+    }
+
+    fn update(&mut self, msg: Self::Msg) {
+        use self::PanelMsg::*;
+        match msg {
+            Command(cmd) => self.run_cmd(cmd),
+            Quit         => gtk::main_quit(),
+        }
     }
 }
 
 impl Widget for Panel {
-    type Model = PanelModel;
-    type ModelParam = Option<&'static Config>;
-    type Msg = PanelMsg;
     type Root = gtk::Window;
 
-    // Return the initial model.
-    fn model(config: Self::ModelParam) -> Self::Model {
-        Self::Model {
-            config: config.unwrap()
-        }
-    }
-
     // Return the root of this widget.
-    fn root(&self) -> &Self::Root {
-        &self.window
+    fn root(&self) -> Self::Root {
+        self.window.clone()
     }
 
-    fn view(relm: &RemoteRelm<Self>, model: &Self::Model) -> Self {
-        let status_items: Vec<_> = model.config.status_items.iter().map(|item| {
-            let item: Box<StatusItem> = match item.as_str() {
-                "battery" => Box::new(BatteryStatusItem),
-                "clock"   => Box::new(ClockStatusItem),
-                "load"    => Box::new(LoadStatusItem),
-                "memory"  => Box::new(MemoryStatusItem),
-                "volume"  => Box::new(VolumeStatusItem),
-                other     => panic!("unknown status component {:#?}", other)
-            };
-
-            item
-        }).collect();
-
-        let builder = Builder::new();
-        let _ = builder.add_from_string(include_str!("panel.glade"));
-
-        let window: gtk::Window = builder.get_object("window").unwrap();
+    fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
+        let window = gtk::Window::new(gtk::WindowType::Toplevel);
+        window.set_wmclass("obsidian", "obsidian");
+        window.set_title("obsidian");
+        window.set_type_hint(gdk::WindowTypeHint::Dock);
+        window.set_decorated(false);
 
         let screen = window.get_screen().unwrap();
         let monitor_id = screen.get_primary_monitor();
@@ -101,77 +99,26 @@ impl Widget for Panel {
         // topw.property_change("_NET_WM_STRUT_PARTIAL","CARDINAL",32,gtk.gdk.PROP_MODE_REPLACE,
         //                      [0, 0, bar_size, 0, 0, 0, 0, 0, x, x+width, 0, 0])
 
-        let cont_workspaces: gtk::Container = builder.get_object("container-workspaces").unwrap();
-        let cont_music:      gtk::Container = builder.get_object("container-music").unwrap();
-        let cont_status:     gtk::Container = builder.get_object("container-status").unwrap();
+        let workspace_component = window.add_widget::<WorkspaceComponent>(());
 
-        let workspaces = WorkspacesComponent::new();
-        cont_workspaces.add(&workspaces.borrow().widget);
+        // window.connect_realize(|window| {
+        //     unsafe {
+        //         let gdk_window = window.get_window().unwrap().to_glib_none().0;
+        //         let type_ = gdk::Atom::intern("CARDINAL").to_glib_none().0;
+        //         let mode = gdk_sys::GdkPropMode::Replace;
 
-        let music = MusicComponent::new(model.config);
-        cont_music.add(&music.borrow().widget);
+        //         let property = gdk::Atom::intern("_NET_WM_STRUT").to_glib_none().0;
+        //         let strut = (&[ 0, 0, 0, 25u64 ]).as_ptr() as *const u8;
+        //         gdk_sys::gdk_property_change(gdk_window, property, type_, 32, mode, strut, 4);
 
-        let mut first = true;
-        for item in &status_items {
-            if item.check_available().is_err() { continue }
-
-            if first {
-                first = false
-            } else {
-                let separator = Separator::new();
-                cont_status.add(&separator);
-            }
-
-            let status = StatusComponent::new(item, model.config);
-            cont_status.add(&status.borrow().widget);
-        }
-
-        window.connect_realize(|window| {
-            unsafe {
-                let gdk_window = window.get_window().unwrap().to_glib_none().0;
-                let type_ = gdk::Atom::intern("CARDINAL").to_glib_none().0;
-                let mode = gdk_sys::GdkPropMode::Replace;
-
-                let property = gdk::Atom::intern("_NET_WM_STRUT").to_glib_none().0;
-                let strut = (&[ 0, 0, 0, 25u64 ]).as_ptr() as *const u8;
-                gdk_sys::gdk_property_change(gdk_window, property, type_, 32, mode, strut, 4);
-
-                let property = gdk::Atom::intern("_NET_WM_STRUT_PARTIAL").to_glib_none().0;
-                let strut = (&[ 0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 1920, 3840u64 ]).as_ptr() as *const u8;
-                gdk_sys::gdk_property_change(gdk_window, property, type_, 32, mode, strut, 12);
-            }
-        });
+        //         let property = gdk::Atom::intern("_NET_WM_STRUT_PARTIAL").to_glib_none().0;
+        //         let strut = (&[ 0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 1920, 3840u64 ]).as_ptr() as *const u8;
+        //         gdk_sys::gdk_property_change(gdk_window, property, type_, 32, mode, strut, 12);
+        //     }
+        // });
 
         window.show_all();
         window.set_keep_above(true);
-
-        let stream = relm.stream().clone();
-        let config = model.config;
-        window.connect_button_release_event(move |widget, event| {
-            if event.get_button() != 3 { return Inhibit(false) }
-
-            let width  = widget.get_allocated_width() as f64;
-            let height = widget.get_allocated_width() as f64;
-
-            let (mouse_x, mouse_y) = event.get_position();
-
-            if mouse_y < 0.0 || mouse_y > height { return Inhibit(false) }
-
-            let command = match mouse_x / width * 3.0 {
-                0.0...1.0 => config.launch.left.clone(),
-                1.0...2.0 => config.launch.middle.clone(),
-                2.0...3.0 => config.launch.right.clone(),
-                _         => None
-            }.map(PanelMsg::Command);
-
-            match command {
-                Some(cmd) => {
-                    stream.emit(cmd);
-                    Inhibit(true)
-                },
-                None => Inhibit(false)
-            }
-        });
 
         window.connect_draw(|widget, cx| {
             let width  = widget.get_allocated_width()  as f64;
@@ -185,21 +132,11 @@ impl Widget for Panel {
             Inhibit(false)
         });
 
-        connect!(relm, window, connect_delete_event(_, _) (PanelMsg::Quit, Inhibit(false)));
+        connect!(relm, window, connect_delete_event(_, _), return (Some(PanelMsg::Quit), Inhibit(false)));
 
-        let panel = Panel {
-            status_items: Rc::new(status_items),
-            window:       window,
-        };
-
-        panel
-    }
-
-    fn update(&mut self, msg: Self::Msg, model: &mut Self::Model) {
-        use self::PanelMsg::*;
-        match msg {
-            Command(cmd) => self.run_cmd(cmd),
-            Quit         => gtk::main_quit(),
+        Panel {
+            window,
+            workspace_component,
         }
     }
 }
