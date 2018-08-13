@@ -2,9 +2,7 @@ extern crate gdk;
 extern crate gtk;
 extern crate relm;
 
-use std::cell::{Cell, RefCell};
 use std::process::Command;
-use std::rc::Rc;
 
 use config::Config;
 use gdk::prelude::*;
@@ -12,7 +10,7 @@ use gtk::Inhibit;
 use gtk::prelude::*;
 use relm::{Component, ContainerWidget, Relm, Update, Widget};
 
-use ::components::workspace::WorkspaceComponent;
+use ::components::workspace::WorkspaceWidget;
 
 pub struct PanelModel {
     config: Config
@@ -26,7 +24,7 @@ pub enum PanelMsg {
 
 pub struct Panel {
     window:              gtk::Window,
-    workspace_component: Component<WorkspaceComponent>,
+    workspace_component: Component<WorkspaceWidget>,
 }
 
 impl Panel {
@@ -46,7 +44,6 @@ impl Update for Panel {
     type ModelParam = Config;
     type Msg = PanelMsg;
 
-    // Return the initial model.
     fn model(_: &Relm<Self>, param: Self::ModelParam) -> Self::Model {
         Self::Model {
             config: param
@@ -65,12 +62,11 @@ impl Update for Panel {
 impl Widget for Panel {
     type Root = gtk::Window;
 
-    // Return the root of this widget.
     fn root(&self) -> Self::Root {
         self.window.clone()
     }
 
-    fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
+    fn view(relm: &Relm<Self>, _model: Self::Model) -> Self {
         let window = gtk::Window::new(gtk::WindowType::Toplevel);
         window.set_wmclass("obsidian", "obsidian");
         window.set_title("obsidian");
@@ -99,7 +95,7 @@ impl Widget for Panel {
         // topw.property_change("_NET_WM_STRUT_PARTIAL","CARDINAL",32,gtk.gdk.PROP_MODE_REPLACE,
         //                      [0, 0, bar_size, 0, 0, 0, 0, 0, x, x+width, 0, 0])
 
-        let workspace_component = window.add_widget::<WorkspaceComponent>(());
+        let workspace_component = window.add_widget::<WorkspaceWidget>(());
 
         // window.connect_realize(|window| {
         //     unsafe {

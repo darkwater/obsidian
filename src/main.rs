@@ -1,4 +1,4 @@
-#![feature(refcell_replace_swap, range_contains)]
+#![feature(nll, range_contains)]
 
 #[macro_use] extern crate relm;
 #[macro_use] extern crate relm_derive;

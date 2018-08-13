@@ -6,7 +6,7 @@ extern crate i3ipc;
 extern crate time;
 
 use std::cell::RefCell;
-use std::{cmp, thread};
+use std::thread;
 use std::ops::Range;
 use std::rc::Rc;
 
@@ -16,32 +16,110 @@ use relm::{Channel, Relm, Update, Widget};
 
 pub struct WorkspaceModel {
     channel: Channel<WorkspaceMsg>,
-    foo: f64
+    items: Vec<Item>,
 }
 
-pub struct WorkspaceComponent {
+pub struct WorkspaceWidget {
     model:  Rc<RefCell<WorkspaceModel>>,
     widget: gtk::DrawingArea,
 }
 
 #[derive(Debug, Msg)]
 pub enum WorkspaceMsg {
-    Foo,
+    Items(Vec<Item>),
 }
 
-impl WorkspaceComponent {
+#[derive(Debug)]
+struct Item {
+    workspace: (i64, i64),
+    position: Range<f64>,
+    state: State,
+}
+
+#[derive(Debug)]
+enum State {
+    /// A workspace that doesn't actually exist (has no windows) but should be shown and can be
+    /// switched to.
+    Phantom,
+
+    /// A regular workspace that has windows in it, but isn't visible.
+    Inhibited,
+
+    /// A workspace that's visible but not currently active.
+    Visible,
+
+    /// The workspace that is currently active.
+    Active,
+
+    /// A workspace with an urgent window in it, even if the workspace is visible or active.
+    Urgent,
+}
+
+impl WorkspaceWidget {
     fn render(model: &WorkspaceModel, widget: &gtk::DrawingArea, cx: &cairo::Context) {
-        let width  = widget.get_allocated_width()  as f64;
+        let _width  = widget.get_allocated_width()  as f64;
         let height = widget.get_allocated_height() as f64;
 
-        let (r, g, b, a) = (0.11, 0.12, 0.23, 0.92);
-        cx.set_source_rgba(r, g, b, a);
-        cx.rectangle(model.foo, 0.0, height, height);
-        cx.fill();
+        if model.items.is_empty() { return }
+
+        let height = widget.get_allocated_height() as f64;
+        let workspace_height = height * 0.25;
+        let skew_ratio = 0.2;
+        let skew = workspace_height * skew_ratio;
+
+        let first_workspace = model.items.first().unwrap() as *const Item;
+        let last_workspace  = model.items.last().unwrap() as *const Item;
+
+        cx.set_line_width(1.0);
+
+        let top    = (height / 2.0 - workspace_height / 2.0).ceil();
+        let bottom = (height / 2.0 + workspace_height / 2.0).floor();
+
+        for workspace in &model.items {
+            let mut left_top     = workspace.position.start;
+            let mut left_bottom  = left_top;
+            let mut right_top    = workspace.position.end;
+            let mut right_bottom = right_top;
+
+            if workspace as *const Item != first_workspace { left_top  += skew; left_bottom  -= skew; }
+            if workspace as *const Item != last_workspace  { right_top += skew; right_bottom -= skew; }
+
+            cx.move_to(left_top - 0.5,     top - 0.5);
+            cx.line_to(right_top + 0.5,    top - 0.5);
+            cx.line_to(right_bottom + 0.5, bottom + 0.5);
+            cx.line_to(left_bottom - 0.5,  bottom + 0.5);
+            cx.close_path();
+
+            match workspace.state {
+                State::Urgent    => cx.set_source_rgba(1.0, 0.7, 0.0, 0.9),
+                State::Active    => cx.set_source_rgba(1.0, 1.0, 1.0, 1.0),
+                State::Visible   => cx.set_source_rgba(1.0, 1.0, 1.0, 0.7),
+                State::Inhibited => cx.set_source_rgba(1.0, 1.0, 1.0, 0.3),
+                State::Phantom   => cx.set_source_rgba(1.0, 1.0, 1.0, 0.3),
+            }
+
+            cx.stroke();
+
+            cx.move_to(left_top,     top);
+            cx.line_to(right_top,    top);
+            cx.line_to(right_bottom, bottom);
+            cx.line_to(left_bottom,  bottom);
+            cx.close_path();
+
+            match workspace.state {
+                State::Urgent    => cx.set_source_rgba(1.0, 0.6, 0.0, 0.7),
+                State::Active    => cx.set_source_rgba(1.0, 1.0, 1.0, 0.8),
+                State::Visible   => cx.set_source_rgba(1.0, 1.0, 1.0, 0.3),
+                State::Inhibited => cx.set_source_rgba(1.0, 1.0, 1.0, 0.3),
+                State::Phantom   => cx.set_source_rgba(0.0, 0.0, 0.0, 0.2),
+            }
+
+            cx.fill();
+        }
     }
 }
 
-impl Update for WorkspaceComponent {
+impl Update for WorkspaceWidget {
     type Model = WorkspaceModel;
     type ModelParam = ();
     type Msg = WorkspaceMsg;
@@ -76,214 +154,126 @@ impl Update for WorkspaceComponent {
                 }
 
                 let mut res = i3.get_workspaces().unwrap().workspaces.iter().map(|workspace| {
-                    let res = parse_workspace_name(&workspace.name);
-                    res
+                    parse_workspace_name(&workspace.name)
+                        .map(|position| {
+                            let state = if workspace.urgent { State::Urgent }
+                            else if workspace.focused { State::Active }
+                            else if workspace.visible { State::Visible }
+                            else { State::Inhibited };
+
+                            (position, state)
+                        })
                 }).collect::<Result<Vec<_>, _>>();
 
-                if let Ok(ref mut workspaces) = res {
-                    (*workspaces).sort();
-                }
+                let res = res.map(|mut workspaces| {
+                    if workspaces.is_empty() { return vec![] }
 
-                println!("{:#?}", res);
+                    let min_desktops = &[4, 2, 1];
+                    let screen_order = &[1, 0, 2];
+                    workspaces.sort_by_key(|(pos, _state)| (screen_order[pos.0 as usize - 1], pos.1));
 
-                sx.send(WorkspaceMsg::Foo);
+                    let workspaces = workspaces.into_iter().peekable();
+
+                    let item_width = 35.0;
+                    let padding    = 6.0;
+                    let spacing    = 15.0;
+
+                    let mut items        = vec![];
+                    let mut left         = -padding;
+                    let mut last_screen  = 0;
+                    let mut last_desktop = 0;
+                    for (workspace, state) in workspaces {
+                        left += padding;
+                        if last_screen != workspace.0 {
+                            if last_screen != 0 {
+                                for n in (last_desktop + 1) .. (min_desktops[last_screen as usize - 1] + 1) {
+                                    let workspace = (last_screen, n);
+
+                                    let position = (left) .. (left + item_width);
+                                    left += item_width + padding;
+
+                                    let state = State::Phantom;
+
+                                    items.push(Item {
+                                        workspace, position, state,
+                                    });
+                                }
+                            }
+
+                            left += spacing;
+                            last_desktop = 0;
+                        }
+
+                        for n in (last_desktop + 1) .. workspace.1 {
+                            let workspace = (workspace.0, n);
+
+                            let position = (left) .. (left + item_width);
+                            left += item_width + padding;
+
+                            let state = State::Phantom;
+
+                            items.push(Item {
+                                workspace, position, state,
+                            });
+                        }
+
+                        let position = (left) .. (left + item_width);
+                        left += item_width;
+
+                        items.push(Item {
+                            workspace, position, state,
+                        });
+
+                        last_screen  = workspace.0;
+                        last_desktop = workspace.1;
+                    }
+
+                    items
+                });
+
+                sx.send(WorkspaceMsg::Items(res.unwrap()));
 
                 listener.next();
             }
         });
 
         WorkspaceModel {
+            items: vec![],
             channel,
-            foo: 0.0,
         }
     }
 
     fn update(&mut self, msg: Self::Msg) {
         use self::WorkspaceMsg::*;
         match msg {
-            Foo => {
-                let mut model = self.model.borrow_mut();
-                model.foo += 10.0;
-            },
+            Items(v) => self.model.borrow_mut().items = v,
         }
         self.widget.queue_draw();
     }
 
-    fn subscriptions(&mut self, relm: &Relm<Self>) {
+    fn subscriptions(&mut self, _relm: &Relm<Self>) {
     }
 }
 
-impl Widget for WorkspaceComponent {
+impl Widget for WorkspaceWidget {
     type Root = gtk::DrawingArea;
 
     fn root(&self) -> Self::Root {
         self.widget.clone()
     }
 
-    fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
+    fn view(_relm: &Relm<Self>, model: Self::Model) -> Self {
         let widget = gtk::DrawingArea::new();
         let model = Rc::new(RefCell::new(model));
 
         widget.connect_draw(clone!(model => move |widget, cx| {
-            WorkspaceComponent::render(&model.borrow(), widget, cx);
+            WorkspaceWidget::render(&model.borrow(), widget, cx);
             Inhibit(false)
         }));
 
-        WorkspaceComponent {
+        WorkspaceWidget {
             model,
             widget,
         }
     }
 }
-
-// impl WorkspaceComponent {
-//     pub fn new() -> Rc<RefCell<Self>> {
-//         let widget = gtk::DrawingArea::new();
-//         widget.set_size_request(100, -1);
-//         widget.set_vexpand(true);
-
-//         // Tell gtk we actually want to receive the events
-//         let mut events = widget.get_events();
-//         events |= gdk_sys::GDK_BUTTON_PRESS_MASK.bits() as i32;
-//         events |= gdk_sys::GDK_BUTTON_RELEASE_MASK.bits() as i32;
-//         widget.set_events(events);
-
-//         let workspaces_component = Rc::new(RefCell::new(WorkspaceComponent {
-//             widget: widget,
-//             workspaces: vec![]
-//         }));
-
-//         let minimum_workspaces_for_screen = vec![ 4, 2, 1 ];
-//         let screen_order = vec![ 1, 0, 2 ]; // position in list is screen_order[monitor_index]
-//                                             // [ 1, 2, 0 ] => screen[0] is displayed in position 1
-//                                             //                screen[1] is displayed in position 2
-//                                             //                screen[2] is displayed in position 0
-
-//         {
-//             let ref widget = workspaces_component.borrow().widget;
-
-//             widget.connect_button_release_event(clone!(workspaces_component => move |widget, event| {
-//                 workspaces_component.borrow().button_release(widget, event)
-//             }));
-
-//             widget.connect_draw(clone!(workspaces_component => move |widget, cx| {
-//                 workspaces_component.borrow().draw(widget, cx)
-//             }));
-//         }
-
-//         enum Message {
-//             Workspace(Vec<Workspace>),
-//             Quit
-//         };
-
-//         let (sx, rx) = channel::<Message>();
-
-//         thread::spawn(move || {
-//             let mut i3 = i3ipc::I3Connection::connect().unwrap();
-//             let mut listener = I3EventListener::connect().unwrap();
-
-//             let subs = [ Subscription::Workspace ];
-//             listener.subscribe(&subs).unwrap();
-//             let mut listener = listener.listen();
-
-//             loop {
-//                 /// Turns workspace names such as 1-2 (screen-workspace) into a tuple of the numbers
-//                 fn parse_workspace_name(name: &str) -> Result<(i64, i64), &'static str> {
-//                     if name.len() < 3                     { return Err("name too short"); }
-//                     if name.len() != name.chars().count() { return Err("name contains multibyte characters"); }
-
-//                     let (screen, workspace) = name.split_at(1);
-//                     let screen    = screen.parse().map_err(|_| "invalid workspace name")?;
-//                     let workspace = (&workspace[1..]).parse().map_err(|_| "invalid workspace name")?;
-
-//                     Ok((screen, workspace))
-//                 }
-
-//                 let mut workspaces = i3.get_workspaces().unwrap().workspaces.iter().map(|workspace| {
-//                     let (screen, index) = parse_workspace_name(&workspace.name).expect("invalid workspace name");
-//                     let position = screen_order[screen as usize - 1];
-//                 }).collect::<Vec<_>>();
-//             }
-//         });
-
-//         workspaces_component
-//     }
-
-//     fn button_release(&self, widget: &gtk::DrawingArea, event: &gdk::EventButton) -> gtk::Inhibit {
-//         if event.get_button() != 1 { return Inhibit(false) }
-
-//         let (x, y) = event.get_position();
-
-//         if 0.0 > y || y > widget.get_allocated_height() as f64 {
-//             return Inhibit(true)
-//         }
-
-//         for workspace in self.workspaces.iter() {
-//             if workspace.position.as_ref().map_or(false, |pos| pos.contains(x)) {
-//                 let mut i3 = i3ipc::I3Connection::connect().unwrap();
-//                 let _ = i3.command(&format!("workspace {}-{}", workspace.screen, workspace.index));
-
-//                 break;
-//             }
-//         }
-
-//         Inhibit(true)
-//     }
-
-//     fn draw(&self, widget: &gtk::DrawingArea, context: &cairo::Context) -> gtk::Inhibit {
-//         if self.workspaces.len() == 0 { return Inhibit(false) }
-
-//         let height = widget.get_allocated_height() as f64;
-//         let workspace_height = height * 0.25;
-//         let skew_ratio = 0.2;
-//         let skew = workspace_height * skew_ratio;
-
-//         let first_workspace = self.workspaces.first().unwrap() as *const Workspace;
-//         let last_workspace  = self.workspaces.last().unwrap() as *const Workspace;
-
-//         context.set_line_width(1.0);
-
-//         let top    = (height / 2.0 - workspace_height / 2.0).ceil();
-//         let bottom = (height / 2.0 + workspace_height / 2.0).floor();
-
-//         for workspace in self.workspaces.as_slice() {
-//             if workspace.position.is_none() { unreachable!("positions should've been calculated at this point") }
-//             let position = workspace.position.as_ref().unwrap();
-
-//             let mut left_top     = position.start;
-//             let mut left_bottom  = left_top;
-//             let mut right_top    = position.end;
-//             let mut right_bottom = right_top;
-
-//             if workspace as *const Workspace != first_workspace { left_top  += skew; left_bottom  -= skew; }
-//             if workspace as *const Workspace != last_workspace  { right_top += skew; right_bottom -= skew; }
-
-//             context.move_to(left_top - 0.5,     top - 0.5);
-//             context.line_to(right_top + 0.5,    top - 0.5);
-//             context.line_to(right_bottom + 0.5, bottom + 0.5);
-//             context.line_to(left_bottom - 0.5,  bottom + 0.5);
-//             context.close_path();
-
-//             // Stroke colors
-//             if workspace.urgent  { context.set_source_rgba(1.0, 0.7, 0.0, 0.9) } else
-//             if workspace.focused { context.set_source_rgba(1.0, 1.0, 1.0, 1.0) } else
-//             if workspace.visible { context.set_source_rgba(1.0, 1.0, 1.0, 0.7) } else
-//                                  { context.set_source_rgba(1.0, 1.0, 1.0, 0.3) }
-//             context.stroke();
-
-//             context.move_to(left_top,     top);
-//             context.line_to(right_top,    top);
-//             context.line_to(right_bottom, bottom);
-//             context.line_to(left_bottom,  bottom);
-
-//             // Fill colors
-//             if workspace.urgent   { context.set_source_rgba(1.0, 0.6, 0.0, 0.7) } else
-//             if workspace.focused  { context.set_source_rgba(1.0, 1.0, 1.0, 0.8) } else
-//             if !workspace.phantom { context.set_source_rgba(1.0, 1.0, 1.0, 0.3) } else
-//                                   { context.set_source_rgba(0.0, 0.0, 0.0, 0.2) }
-//             context.fill();
-//         }
-
-//         Inhibit(false)
-//     }
-// }
