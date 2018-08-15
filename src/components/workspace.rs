@@ -6,9 +6,10 @@ extern crate i3ipc;
 extern crate time;
 
 use std::cell::RefCell;
-use std::thread;
 use std::ops::Range;
+use std::process::Command;
 use std::rc::Rc;
+use std::thread;
 
 use gtk::prelude::*;
 use i3ipc::{I3Connection, I3EventListener, Subscription};
@@ -27,10 +28,11 @@ pub struct WorkspaceWidget {
 #[derive(Debug, Msg)]
 pub enum WorkspaceMsg {
     Items(Vec<Item>),
+    Click((f64, f64)),
 }
 
 #[derive(Debug)]
-struct Item {
+pub struct Item {
     workspace: (i64, i64),
     position: Range<f64>,
     state: State,
@@ -62,7 +64,6 @@ impl WorkspaceWidget {
 
         if model.items.is_empty() { return }
 
-        let height = widget.get_allocated_height() as f64;
         let workspace_height = height * 0.25;
         let skew_ratio = 0.2;
         let skew = workspace_height * skew_ratio;
@@ -117,6 +118,18 @@ impl WorkspaceWidget {
             cx.fill();
         }
     }
+
+    fn handle_click(&self, (x, _y): (f64, f64)) {
+        for item in &self.model.borrow().items {
+            if item.position.contains(&x) {
+                Command::new("/bin/bash")
+                    .arg("-c")
+                    .arg(format!("i3 workspace {}-{}", item.workspace.0, item.workspace.1))
+                    .spawn()
+                    .expect("failed to execute child");
+            }
+        }
+    }
 }
 
 impl Update for WorkspaceWidget {
@@ -153,7 +166,7 @@ impl Update for WorkspaceWidget {
                     Ok((screen, workspace))
                 }
 
-                let mut res = i3.get_workspaces().unwrap().workspaces.iter().map(|workspace| {
+                let res = i3.get_workspaces().unwrap().workspaces.iter().map(|workspace| {
                     parse_workspace_name(&workspace.name)
                         .map(|position| {
                             let state = if workspace.urgent { State::Urgent }
@@ -247,6 +260,7 @@ impl Update for WorkspaceWidget {
         use self::WorkspaceMsg::*;
         match msg {
             Items(v) => self.model.borrow_mut().items = v,
+            Click(e) => self.handle_click(e),
         }
         self.widget.queue_draw();
     }
@@ -262,9 +276,19 @@ impl Widget for WorkspaceWidget {
         self.widget.clone()
     }
 
-    fn view(_relm: &Relm<Self>, model: Self::Model) -> Self {
+    fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
         let widget = gtk::DrawingArea::new();
         let model = Rc::new(RefCell::new(model));
+
+        widget.add_events(gdk::EventMask::BUTTON_PRESS_MASK.bits() as i32);
+        widget.add_events(gdk::EventMask::BUTTON_RELEASE_MASK.bits() as i32);
+
+        connect!(relm, widget, connect_button_release_event(_, e), return if e.get_button() == 1 {
+            (Some(WorkspaceMsg::Click(e.get_position())), Inhibit(true))
+        }
+        else {
+            (None, Inhibit(false))
+        });
 
         widget.connect_draw(clone!(model => move |widget, cx| {
             WorkspaceWidget::render(&model.borrow(), widget, cx);

@@ -2,8 +2,6 @@ extern crate gdk;
 extern crate gtk;
 extern crate relm;
 
-use std::process::Command;
-
 use config::Config;
 use gdk::prelude::*;
 use gtk::Inhibit;
@@ -18,7 +16,6 @@ pub struct PanelModel {
 
 #[derive(Msg)]
 pub enum PanelMsg {
-    Command(String),
     Quit,
 }
 
@@ -28,15 +25,6 @@ pub struct Panel {
 }
 
 impl Panel {
-    fn run_cmd(&self, mut cmd: String) {
-        cmd.push('&');
-        let _ = Command::new("/bin/bash")
-            .arg("-c")
-            .arg(cmd)
-            .spawn()
-            .expect("failed to execute child")
-            .wait();
-    }
 }
 
 impl Update for Panel {
@@ -53,8 +41,7 @@ impl Update for Panel {
     fn update(&mut self, msg: Self::Msg) {
         use self::PanelMsg::*;
         match msg {
-            Command(cmd) => self.run_cmd(cmd),
-            Quit         => gtk::main_quit(),
+            Quit => gtk::main_quit(),
         }
     }
 }
@@ -95,8 +82,6 @@ impl Widget for Panel {
         // topw.property_change("_NET_WM_STRUT_PARTIAL","CARDINAL",32,gtk.gdk.PROP_MODE_REPLACE,
         //                      [0, 0, bar_size, 0, 0, 0, 0, 0, x, x+width, 0, 0])
 
-        let workspace_component = window.add_widget::<WorkspaceWidget>(());
-
         // window.connect_realize(|window| {
         //     unsafe {
         //         let gdk_window = window.get_window().unwrap().to_glib_none().0;
@@ -113,6 +98,8 @@ impl Widget for Panel {
         //     }
         // });
 
+        let workspace_component = window.add_widget::<WorkspaceWidget>(());
+
         window.show_all();
         window.set_keep_above(true);
 
@@ -128,7 +115,7 @@ impl Widget for Panel {
             Inhibit(false)
         });
 
-        connect!(relm, window, connect_delete_event(_, _), return (Some(PanelMsg::Quit), Inhibit(false)));
+        connect!(relm, window, connect_delete_event(_, _), return (PanelMsg::Quit, Inhibit(false)));
 
         Panel {
             window,
