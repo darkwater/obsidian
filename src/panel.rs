@@ -1,5 +1,9 @@
+extern crate cairo;
 extern crate gdk;
 extern crate gtk;
+extern crate libloading as lib;
+extern crate pango;
+extern crate pangocairo;
 extern crate relm;
 
 use config::Config;
@@ -9,6 +13,7 @@ use gtk::prelude::*;
 use relm::{Component, ContainerWidget, Relm, Update, Widget};
 
 use ::components::workspace::WorkspaceWidget;
+use ::components::plugin::PluginWidget;
 
 pub struct PanelModel {
     config: Config
@@ -20,6 +25,7 @@ pub enum PanelMsg {
 }
 
 pub struct Panel {
+    plugins:             Vec<Component<PluginWidget>>,
     window:              gtk::Window,
     workspace_component: Component<WorkspaceWidget>,
 }
@@ -98,6 +104,8 @@ impl Widget for Panel {
         //     }
         // });
 
+        let test_component = window.add_widget::<PluginWidget>("./experiment.so");
+
         let workspace_component = window.add_widget::<WorkspaceWidget>(());
 
         window.show_all();
@@ -118,8 +126,8 @@ impl Widget for Panel {
         connect!(relm, window, connect_delete_event(_, _), return (PanelMsg::Quit, Inhibit(false)));
 
         Panel {
-            window,
-            workspace_component,
+            plugins: vec![ test_component ],
+            window, workspace_component,
         }
     }
 }

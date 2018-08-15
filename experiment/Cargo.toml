@@ -1,0 +1,10 @@
+[package]
+name = "experiment"
+version = "0.1.0"
+authors = ["Sam Lakerveld <darkwater124@gmail.com>"]
+
+[lib]
+crate-type = [ "cdylib" ]
+
+[dependencies]
+relm-core = "0.14.6"

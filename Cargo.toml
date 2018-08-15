@@ -11,9 +11,11 @@ gdk-sys     = "0.6.0"
 glib        = "0.5.0"
 gtk         = { version = "0.4.1", features = [ "v3_20" ] }
 i3ipc       = "0.8.2"
+libloading  = "0.5.0"
 mpd         = { git = "https://github.com/kstep/rust-mpd" }
 pango       = "0.4.0"
 pangocairo  = "0.5.0"
 relm        = "0.14.6"
 relm-derive = "0.14.6"
+relm-core   = "0.14.6"
 time        = "0.1.40"
