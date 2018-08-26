@@ -15,5 +15,6 @@ mpd         = { git = "https://github.com/kstep/rust-mpd" }
 pango       = "0.4.0"
 pangocairo  = "0.5.0"
 relm        = "0.14.6"
+relm-core   = "0.14.6"
 relm-derive = "0.14.6"
 time        = "0.1.40"

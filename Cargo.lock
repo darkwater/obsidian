@@ -392,6 +392,7 @@ dependencies = [
  "pango 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pangocairo 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "relm 0.14.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "relm-core 0.14.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "relm-derive 0.14.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

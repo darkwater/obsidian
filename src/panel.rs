@@ -9,9 +9,11 @@ use gtk::prelude::*;
 use relm::{Component, ContainerWidget, Relm, Update, Widget};
 
 use ::components::workspace::WorkspaceWidget;
+use ::monitor::Monitor;
 
 pub struct PanelModel {
-    config: Config
+    config:   Config,
+    monitors: Vec<Box<dyn Monitor>>,
 }
 
 #[derive(Msg)]
@@ -20,6 +22,7 @@ pub enum PanelMsg {
 }
 
 pub struct Panel {
+    model:               PanelModel,
     window:              gtk::Window,
     workspace_component: Component<WorkspaceWidget>,
 }
@@ -34,7 +37,8 @@ impl Update for Panel {
 
     fn model(_: &Relm<Self>, param: Self::ModelParam) -> Self::Model {
         Self::Model {
-            config: param
+            config:   param,
+            monitors: vec![],
         }
     }
 
@@ -53,7 +57,7 @@ impl Widget for Panel {
         self.window.clone()
     }
 
-    fn view(relm: &Relm<Self>, _model: Self::Model) -> Self {
+    fn view(relm: &Relm<Self>, mut model: Self::Model) -> Self {
         let window = gtk::Window::new(gtk::WindowType::Toplevel);
         window.set_wmclass("obsidian", "obsidian");
         window.set_title("obsidian");
@@ -100,6 +104,12 @@ impl Widget for Panel {
 
         let workspace_component = window.add_widget::<WorkspaceWidget>(());
 
+        let monitor_iface      = relm::execute::<::monitor::MonitorIface>(());
+        // let bar_component   = window.add_widget::<MonitorBar>(());
+        // let panel_component = window.add_widget::<MonitorPanel>(());
+        // connect_stream!(monitor_iface@BarUpdate(u),   bar_compoment.stream(),   BarUpdate(u));
+        // connect_stream!(monitor_iface@PanelUpdate(u), panel_compoment.stream(), PanelUpdate(u));
+
         window.show_all();
         window.set_keep_above(true);
 
@@ -118,6 +128,7 @@ impl Widget for Panel {
         connect!(relm, window, connect_delete_event(_, _), return (PanelMsg::Quit, Inhibit(false)));
 
         Panel {
+            model,
             window,
             workspace_component,
         }

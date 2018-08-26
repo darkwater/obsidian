@@ -7,13 +7,14 @@ extern crate gdk_sys;
 extern crate glib;
 extern crate gtk;
 extern crate i3ipc;
-
+extern crate relm_core;
 extern crate time;
 
 #[macro_use] mod util;
-mod config;
-mod panel;
 mod components;
+mod config;
+mod monitor;
+mod panel;
 
 use config::Config;
 use panel::Panel;
