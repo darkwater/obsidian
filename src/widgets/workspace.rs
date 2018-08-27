@@ -59,7 +59,7 @@ enum State {
 
 impl WorkspaceWidget {
     fn render(model: &WorkspaceModel, widget: &gtk::DrawingArea, cx: &cairo::Context) {
-        let _width  = widget.get_allocated_width()  as f64;
+        let width  = widget.get_allocated_width()  as f64;
         let height = widget.get_allocated_height() as f64;
 
         if model.items.is_empty() { return }
@@ -67,6 +67,12 @@ impl WorkspaceWidget {
         let workspace_height = height * 0.25;
         let skew_ratio = 0.2;
         let skew = workspace_height * skew_ratio;
+
+        let required_width = model.items.last().unwrap().position.end + skew + 5.0;
+        if required_width > width {
+            widget.set_size_request(required_width as i32 + 5, height as i32);
+            return;
+        }
 
         let first_workspace = model.items.first().unwrap() as *const Item;
         let last_workspace  = model.items.last().unwrap() as *const Item;

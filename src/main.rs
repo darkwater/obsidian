@@ -11,7 +11,7 @@ extern crate relm_core;
 extern crate time;
 
 #[macro_use] mod util;
-mod components;
+mod widgets;
 mod config;
 mod monitor;
 mod panel;

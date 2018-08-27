@@ -8,7 +8,6 @@ pub trait Monitor {
 }
 
 pub struct MonitorIfaceModel {
-    relm:     Relm<MonitorIface>,
     monitors: Vec<Option<(Box<dyn Monitor>, MonitorState)>>,
 }
 
@@ -17,9 +16,10 @@ struct MonitorState {
     text: String,
 }
 
-#[derive(Msg)]
+#[derive(Debug, Msg)]
 pub enum MonitorIfaceMsg {
     RecvMsg(usize, MonitorMsg),
+    BarUpdate(String),
 }
 
 #[derive(Debug)]
@@ -28,6 +28,7 @@ pub enum MonitorMsg {
 }
 
 pub struct MonitorIface {
+    relm:  Relm<MonitorIface>,
     model: MonitorIfaceModel,
 }
 
@@ -59,15 +60,22 @@ impl Update for MonitorIface {
         clock.start(sx);
         monitors.push(Some((Box::new(clock), empty_state())));
 
+        let clock = Clock::new();
+        let (ch, sx) = create_channel(relm, monitors.len());
+        clock.start(sx);
+        monitors.push(Some((Box::new(clock), empty_state())));
+
         MonitorIfaceModel {
-            relm: relm.clone(),
             monitors,
         }
     }
 
     fn update(&mut self, msg: Self::Msg) {
+        println!("{:#?}", msg);
+        use self::MonitorIfaceMsg::*;
         match msg {
-            MonitorIfaceMsg::RecvMsg(i, m) => self.recv_msg(i, m),
+            RecvMsg(i, m) => self.recv_msg(i, m),
+            BarUpdate(_)  => (), // handled by parent
         }
     }
 }
@@ -80,14 +88,16 @@ impl MonitorIface {
             MonitorMsg::SetText(s) => state.text = s,
         }
 
+        self.relm.stream().emit(MonitorIfaceMsg::BarUpdate(state.text.clone()));
         println!("{:#?}", state);
     }
 }
 
 impl UpdateNew for MonitorIface {
-    fn new(_relm: &Relm<Self>, model: Self::Model) -> Self {
+    fn new(relm: &Relm<Self>, model: Self::Model) -> Self {
         MonitorIface {
-            model
+            relm: relm.clone(),
+            model,
         }
     }
 }

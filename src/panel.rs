@@ -8,8 +8,9 @@ use gtk::Inhibit;
 use gtk::prelude::*;
 use relm::{Component, ContainerWidget, Relm, Update, Widget};
 
-use ::components::workspace::WorkspaceWidget;
-use ::monitor::Monitor;
+use ::widgets::workspace::WorkspaceWidget;
+use ::widgets::monitor_bar::{MonitorBarMsg, MonitorBarWidget};
+use ::monitor::{Monitor, MonitorIfaceMsg};
 
 pub struct PanelModel {
     config:   Config,
@@ -25,6 +26,7 @@ pub struct Panel {
     model:               PanelModel,
     window:              gtk::Window,
     workspace_component: Component<WorkspaceWidget>,
+    bar_component:       Component<MonitorBarWidget>,
 }
 
 impl Panel {
@@ -102,13 +104,18 @@ impl Widget for Panel {
         //     }
         // });
 
-        let workspace_component = window.add_widget::<WorkspaceWidget>(());
+        let container = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        container.set_hexpand(true);
+        container.set_vexpand(true);
+        window.add(&container);
+
+        let workspace_component = container.add_widget::<WorkspaceWidget>(());
 
         let monitor_iface      = relm::execute::<::monitor::MonitorIface>(());
-        // let bar_component   = window.add_widget::<MonitorBar>(());
-        // let panel_component = window.add_widget::<MonitorPanel>(());
-        // connect_stream!(monitor_iface@BarUpdate(u),   bar_compoment.stream(),   BarUpdate(u));
-        // connect_stream!(monitor_iface@PanelUpdate(u), panel_compoment.stream(), PanelUpdate(u));
+        let bar_component      = container.add_widget::<MonitorBarWidget>(());
+        // let panel_component = container.add_widget::<MonitorPanelWidget>(());
+        connect_stream!(monitor_iface@MonitorIfaceMsg::BarUpdate(ref u),   bar_component.stream(),   MonitorBarMsg::RecvUpdate(u.clone()));
+        // connect_stream!(monitor_iface@PanelUpdate(u), panel_compoment.stream(), RecvUpdate(u));
 
         window.show_all();
         window.set_keep_above(true);
@@ -131,6 +138,7 @@ impl Widget for Panel {
             model,
             window,
             workspace_component,
+            bar_component,
         }
     }
 }
