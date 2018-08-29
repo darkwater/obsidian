@@ -10,7 +10,8 @@ use relm::{Component, ContainerWidget, Relm, Update, Widget};
 
 use ::widgets::workspace::WorkspaceWidget;
 use ::widgets::monitor_bar::{MonitorBarMsg, MonitorBarWidget};
-use ::monitor::{Monitor, MonitorIfaceMsg};
+use ::manager::{Manager, ManagerMsg};
+use ::monitor::Monitor;
 
 pub struct PanelModel {
     config:   Config,
@@ -23,10 +24,10 @@ pub enum PanelMsg {
 }
 
 pub struct Panel {
-    model:               PanelModel,
-    window:              gtk::Window,
-    workspace_component: Component<WorkspaceWidget>,
-    bar_component:       Component<MonitorBarWidget>,
+    model:       PanelModel,
+    window:      gtk::Window,
+    workspaces:  Component<WorkspaceWidget>,
+    bar_display: Component<MonitorBarWidget>,
 }
 
 impl Panel {
@@ -109,13 +110,13 @@ impl Widget for Panel {
         container.set_vexpand(true);
         window.add(&container);
 
-        let workspace_component = container.add_widget::<WorkspaceWidget>(());
+        let workspaces = container.add_widget::<WorkspaceWidget>(());
 
-        let monitor_iface      = relm::execute::<::monitor::MonitorIface>(());
-        let bar_component      = container.add_widget::<MonitorBarWidget>(());
-        // let panel_component = container.add_widget::<MonitorPanelWidget>(());
-        connect_stream!(monitor_iface@MonitorIfaceMsg::BarUpdate(ref u),   bar_component.stream(),   MonitorBarMsg::RecvUpdate(u.clone()));
-        // connect_stream!(monitor_iface@PanelUpdate(u), panel_compoment.stream(), RecvUpdate(u));
+        let monitor_iface    = relm::execute::<::manager::Manager>(());
+        let bar_display      = container.add_widget::<MonitorBarWidget>(());
+        // let popup_display = container.add_widget::<MonitorPanelWidget>(());
+        connect_stream!(monitor_iface@ManagerMsg::DisplayUpdate(idx, ref state), bar_display.stream(), MonitorBarMsg::RecvUpdate(idx, state.clone()));
+        // connect_stream!(monitor_iface@ManagerMsg::DisplayUpdate(idx, ref state), popup_display.stream(), MonitorPanelMsg::RecvUpdate(u));
 
         window.show_all();
         window.set_keep_above(true);
@@ -137,8 +138,8 @@ impl Widget for Panel {
         Panel {
             model,
             window,
-            workspace_component,
-            bar_component,
+            workspaces,
+            bar_display,
         }
     }
 }

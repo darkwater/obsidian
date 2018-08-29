@@ -13,6 +13,9 @@ use gtk::prelude::*;
 use self::pango::prelude::LayoutExt;
 use relm::{Channel, Relm, Update, Widget};
 
+use ::monitor::*;
+use ::manager::*;
+
 pub struct MonitorBarModel {
     items: Vec<Item>,
 }
@@ -25,7 +28,7 @@ pub struct MonitorBarWidget {
 #[derive(Debug, Msg)]
 pub enum MonitorBarMsg {
     Click((f64, f64)),
-    RecvUpdate(String),
+    RecvUpdate(usize, MonitorState),
 }
 
 #[derive(Debug)]
@@ -87,11 +90,11 @@ impl Update for MonitorBarWidget {
     }
 
     fn update(&mut self, msg: Self::Msg) {
-        println!("{:#?}", msg);
+        println!("monitor_bar: {:#?}", msg);
         use self::MonitorBarMsg::*;
         match msg {
-            Click(e)      => self.handle_click(e),
-            RecvUpdate(s) => self.model.borrow_mut().items[0].text = s,
+            Click(e)         => self.handle_click(e),
+            RecvUpdate(i, s) => self.model.borrow_mut().items[0].text = s.text.clone(),
         }
         self.widget.queue_draw();
     }

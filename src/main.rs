@@ -11,10 +11,11 @@ extern crate relm_core;
 extern crate time;
 
 #[macro_use] mod util;
-mod widgets;
 mod config;
+mod manager;
 mod monitor;
 mod panel;
+mod widgets;
 
 use config::Config;
 use panel::Panel;
