@@ -6,6 +6,7 @@ extern crate pangocairo;
 extern crate relm_core;
 
 use std::cell::RefCell;
+use std::mem;
 use std::ops::Range;
 use std::rc::Rc;
 
@@ -17,7 +18,8 @@ use ::monitor::*;
 use ::manager::*;
 
 pub struct MonitorBarModel {
-    items: Vec<Item>,
+    states: Vec<Option<MonitorState>>,
+    displayed: Vec<usize>,
 }
 
 pub struct MonitorBarWidget {
@@ -31,17 +33,15 @@ pub enum MonitorBarMsg {
     RecvUpdate(usize, MonitorState),
 }
 
-#[derive(Debug)]
-pub struct Item {
-    text: String,
-}
-
 impl MonitorBarWidget {
     fn render(model: &MonitorBarModel, widget: &gtk::DrawingArea, context: &cairo::Context) {
         let _width  = widget.get_allocated_width()  as f64;
         let height = widget.get_allocated_height() as f64;
 
-        let text = &model.items[0].text;
+        let mut text = String::new();
+        for item in &model.displayed {
+            text.push_str(&format!(" [ item {} ] ", item));
+        }
 
         let font = pango::FontDescription::from_string("Droid Sans Mono 10");
         let layout = pangocairo::functions::create_layout(context).unwrap();
@@ -62,6 +62,47 @@ impl MonitorBarWidget {
 
         context.move_to(x, y);
         pangocairo::functions::show_layout(&context, &layout);
+    }
+
+    fn recv_update(&mut self, idx: usize, new: MonitorState) {
+        let model = &mut self.model.borrow_mut();
+
+        if idx >= model.states.len() {
+            model.states.resize(idx + 1, None);
+        }
+
+        match &mut model.states[idx] {
+            Some(ref mut state) => {
+                let mut old = new;
+                mem::swap(state, &mut old);
+
+                if old.location != state.location {
+                    match (&old.location, &state.location) {
+                        (_, DisplayLocation::Bar) => Self::show_state(model, idx),
+                        (DisplayLocation::Bar, _) => Self::hide_state(model, idx),
+                        _ => (),
+                    }
+                }
+            },
+            None => {
+                model.states[idx] = Some(new);
+                if model.states[idx].as_ref().unwrap().location == DisplayLocation::Bar {
+                    Self::show_state(model, idx);
+                }
+            },
+        }
+
+        self.widget.queue_draw();
+    }
+
+    fn show_state(model: &mut MonitorBarModel, idx: usize) {
+        println!("showing");
+        model.displayed.insert(0, idx);
+    }
+
+    fn hide_state(model: &mut MonitorBarModel, idx: usize) {
+        println!("hiding");
+        model.displayed.retain(|i| *i != idx);
     }
 
     fn handle_click(&self, (x, _y): (f64, f64)) {
@@ -85,16 +126,16 @@ impl Update for MonitorBarWidget {
     // Return the initial model.
     fn model(relm: &Relm<Self>, _param: Self::ModelParam) -> Self::Model {
         MonitorBarModel {
-            items: vec![ Item { text: "unset".to_string() } ],
+            states: vec![],
+            displayed: vec![],
         }
     }
 
     fn update(&mut self, msg: Self::Msg) {
-        println!("monitor_bar: {:#?}", msg);
         use self::MonitorBarMsg::*;
         match msg {
             Click(e)         => self.handle_click(e),
-            RecvUpdate(i, s) => self.model.borrow_mut().items[0].text = s.text.clone(),
+            RecvUpdate(i, s) => self.recv_update(i, s),
         }
         self.widget.queue_draw();
     }

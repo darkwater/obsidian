@@ -51,12 +51,11 @@ impl Monitor for Clock {
                 //     _       => unreachable!()
                 // };
 
+                let important = now.tm_nsec % 2 == 0;
                 let text = format!("{} {} {:02}:{:02}", weekday, now.tm_mday, now.tm_hour, now.tm_min);
-                println!("thread: {}", text);
+                println!("{} / important: {}", text, important);
                 channel.send(MonitorMsg::SetText(text));
 
-                let important = now.tm_nsec % 2 == 0;
-                println!("important: {}", important);
                 channel.send(MonitorMsg::SetRelevance(match important {
                     true  => Relevance::Urgent,
                     false => Relevance::Background,
@@ -70,7 +69,7 @@ impl Monitor for Clock {
 
                 // let _ = sx.send(changes);
 
-                let sleep_time = ::std::time::Duration::new(59 - now.tm_sec as u64, 1000000000 - now.tm_nsec as u32);
+                let sleep_time = ::std::time::Duration::new(4 - now.tm_sec as u64 % 5, 1000000000 - now.tm_nsec as u32);
                 thread::sleep(sleep_time);
             }
         });

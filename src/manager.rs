@@ -68,7 +68,6 @@ impl Update for Manager {
     }
 
     fn update(&mut self, msg: Self::Msg) {
-        println!("{:#?}", msg);
         use self::ManagerMsg::*;
         match msg {
             RecvMsg(i, m)   => self.recv_msg(i, m),
@@ -89,13 +88,13 @@ impl Manager {
                     Relevance::Background => DisplayLocation::Popup,
                 };
 
+                state.relevance = r;
+
                 if state.location != new_location {
                     state.location = new_location;
 
                     self.relm.stream().emit(ManagerMsg::DisplayUpdate(idx, state.clone()));
                 }
-
-                state.relevance = r;
             }
         }
     }
