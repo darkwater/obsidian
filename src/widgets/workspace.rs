@@ -15,7 +15,10 @@ use gtk::prelude::*;
 use i3ipc::{I3Connection, I3EventListener, Subscription};
 use relm::{Channel, Relm, Update, Widget};
 
+use ::config::Config;
+
 pub struct WorkspaceModel {
+    config: &'static Config,
     channel: Channel<WorkspaceMsg>,
     items: Vec<Item>,
 }
@@ -61,14 +64,15 @@ impl WorkspaceWidget {
     fn render(model: &WorkspaceModel, widget: &gtk::DrawingArea, cx: &cairo::Context) {
         let width  = widget.get_allocated_width()  as f64;
         let height = widget.get_allocated_height() as f64;
+        let dpi    = model.config.dpi.get();
 
         if model.items.is_empty() { return }
 
         let workspace_height = height * 0.25;
         let skew_ratio = 0.2;
-        let skew = workspace_height * skew_ratio;
+        let skew = workspace_height * skew_ratio * dpi;
 
-        let required_width = model.items.last().unwrap().position.end + skew + 5.0;
+        let required_width = model.items.last().unwrap().position.end * dpi + skew + 5.0;
         if required_width > width {
             widget.set_size_request(required_width as i32 + 5, height as i32);
             return;
@@ -77,15 +81,15 @@ impl WorkspaceWidget {
         let first_workspace = model.items.first().unwrap() as *const Item;
         let last_workspace  = model.items.last().unwrap() as *const Item;
 
-        cx.set_line_width(1.0);
+        cx.set_line_width((1.0 * dpi).floor());
 
         let top    = (height / 2.0 - workspace_height / 2.0).ceil();
         let bottom = (height / 2.0 + workspace_height / 2.0).floor();
 
         for workspace in &model.items {
-            let mut left_top     = workspace.position.start;
+            let mut left_top     = workspace.position.start * dpi;
             let mut left_bottom  = left_top;
-            let mut right_top    = workspace.position.end;
+            let mut right_top    = workspace.position.end * dpi;
             let mut right_bottom = right_top;
 
             if workspace as *const Item != first_workspace { left_top  += skew; left_bottom  -= skew; }
@@ -140,11 +144,11 @@ impl WorkspaceWidget {
 
 impl Update for WorkspaceWidget {
     type Model = WorkspaceModel;
-    type ModelParam = ();
+    type ModelParam = &'static Config;
     type Msg = WorkspaceMsg;
 
     // Return the initial model.
-    fn model(relm: &Relm<Self>, _param: Self::ModelParam) -> Self::Model {
+    fn model(relm: &Relm<Self>, config: Self::ModelParam) -> Self::Model {
         let stream = relm.stream().clone();
 
         let (channel, sx) = Channel::new(move |msg| {
@@ -257,6 +261,7 @@ impl Update for WorkspaceWidget {
         });
 
         WorkspaceModel {
+            config,
             items: vec![],
             channel,
         }

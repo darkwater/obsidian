@@ -14,7 +14,7 @@ use ::manager::{Manager, ManagerMsg};
 use ::monitor::Monitor;
 
 pub struct PanelModel {
-    config:   Config,
+    config:   &'static Config,
     monitors: Vec<Box<dyn Monitor>>,
 }
 
@@ -23,6 +23,7 @@ pub enum PanelMsg {
     Quit,
 }
 
+#[allow(unused)] // We must store Components to keep their channels
 pub struct Panel {
     model:       PanelModel,
     window:      gtk::Window,
@@ -38,9 +39,12 @@ impl Update for Panel {
     type ModelParam = Config;
     type Msg = PanelMsg;
 
-    fn model(_: &Relm<Self>, param: Self::ModelParam) -> Self::Model {
+    fn model(_: &Relm<Self>, config: Self::ModelParam) -> Self::Model {
+        let config = Box::new(config);
+        let config = Box::leak(config);
+
         Self::Model {
-            config:   param,
+            config,
             monitors: vec![],
         }
     }
@@ -60,22 +64,27 @@ impl Widget for Panel {
         self.window.clone()
     }
 
-    fn view(relm: &Relm<Self>, mut model: Self::Model) -> Self {
+    fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
         let window = gtk::Window::new(gtk::WindowType::Toplevel);
         window.set_wmclass("obsidian", "obsidian");
         window.set_title("obsidian");
         window.set_type_hint(gdk::WindowTypeHint::Dock);
         window.set_decorated(false);
 
-        let screen = window.get_screen().unwrap();
+        let screen     = window.get_screen().unwrap();
         let monitor_id = screen.get_primary_monitor();
-        let monitor = screen.get_monitor_geometry(monitor_id);
+        let monitor    = screen.get_monitor_geometry(monitor_id);
 
         let visual = screen.get_rgba_visual().unwrap();
         window.set_app_paintable(true);
         window.set_visual(Some(&visual));
 
-        let height = 25;
+        if model.config.dpi.get() <= 0.0 {
+            model.config.dpi.set(screen.get_resolution() / 96.0);
+        }
+        screen.set_resolution(96.0);
+
+        let height = model.config.dpi_scale(25);
 
         let (x, y) = (monitor.x, monitor.y + monitor.height - height);
         let (width, height) = (monitor.width, height);
@@ -110,7 +119,7 @@ impl Widget for Panel {
         container.set_vexpand(true);
         window.add(&container);
 
-        let workspaces = container.add_widget::<WorkspaceWidget>(());
+        let workspaces = container.add_widget::<WorkspaceWidget>(model.config);
 
         let monitor_iface    = relm::execute::<::manager::Manager>(());
         let bar_display      = container.add_widget::<MonitorBarWidget>(());

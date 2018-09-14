@@ -1,10 +1,8 @@
-status_items = [ 'volume', 'memory', 'load', 'battery', 'clock' ]
+dpi = -1
 
 [mpd]
 host = "127.0.0.1"
 port = 6600
-
-[launch]
 
 [colors]
 grey          = "#101010"

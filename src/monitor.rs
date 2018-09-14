@@ -25,7 +25,7 @@ pub enum DisplayLocation {
 }
 
 pub trait Monitor {
-    fn start(&self, Sender<MonitorMsg>);
+    fn start(&self, channel: Sender<MonitorMsg>);
 }
 
 pub struct Clock;

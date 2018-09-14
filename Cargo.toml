@@ -4,17 +4,19 @@ version = "0.2.0"
 authors = ["Sam Lakerveld <darkwater124@gmail.com>"]
 
 [dependencies]
-cairo-rs    = "0.4.1"
-config      = "0.9.0"
-gdk         = "0.8.0"
-gdk-sys     = "0.6.0"
-glib        = "0.5.0"
-gtk         = { version = "0.4.1", features = [ "v3_20" ] }
-i3ipc       = "0.8.2"
-mpd         = { git = "https://github.com/kstep/rust-mpd" }
-pango       = "0.4.0"
-pangocairo  = "0.5.0"
-relm        = "0.14.6"
-relm-core   = "0.14.6"
-relm-derive = "0.14.6"
-time        = "0.1.40"
+cairo-rs     = "0.5.0"
+config       = "0.9.0"
+gdk          = "0.9.0"
+gdk-sys      = "0.7.0"
+glib         = "0.6.0"
+gtk          = { version = "0.5.0", features = [ "v3_20" ] }
+i3ipc        = "0.8.2"
+mpd          = { git = "https://github.com/kstep/rust-mpd" }
+pango        = "0.5.0"
+pangocairo   = "0.6.0"
+relm         = "0.15.0"
+relm-core    = "0.15.0"
+relm-derive  = "0.15.0"
+serde        = "1.0.78"
+serde_derive = "1.0.78"
+time         = "0.1.40"
