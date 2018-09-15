@@ -18,9 +18,9 @@ use relm::{Channel, Relm, Update, Widget};
 use ::config::Config;
 
 pub struct WorkspaceModel {
-    config: &'static Config,
+    config:  &'static Config,
     channel: Channel<WorkspaceMsg>,
-    items: Vec<Item>,
+    items:   Vec<Item>,
 }
 
 pub struct WorkspaceWidget {
@@ -81,7 +81,8 @@ impl WorkspaceWidget {
         let first_workspace = model.items.first().unwrap() as *const Item;
         let last_workspace  = model.items.last().unwrap() as *const Item;
 
-        cx.set_line_width((1.0 * dpi).floor());
+        let line_width = (1.0 * dpi).floor();
+        cx.set_line_width(line_width);
 
         let top    = (height / 2.0 - workspace_height / 2.0).ceil();
         let bottom = (height / 2.0 + workspace_height / 2.0).floor();
@@ -95,10 +96,11 @@ impl WorkspaceWidget {
             if workspace as *const Item != first_workspace { left_top  += skew; left_bottom  -= skew; }
             if workspace as *const Item != last_workspace  { right_top += skew; right_bottom -= skew; }
 
-            cx.move_to(left_top - 0.5,     top - 0.5);
-            cx.line_to(right_top + 0.5,    top - 0.5);
-            cx.line_to(right_bottom + 0.5, bottom + 0.5);
-            cx.line_to(left_bottom - 0.5,  bottom + 0.5);
+            let offset = 0.5 * line_width;
+            cx.move_to(left_top - offset,     top - offset);
+            cx.line_to(right_top + offset,    top - offset);
+            cx.line_to(right_bottom + offset, bottom + offset);
+            cx.line_to(left_bottom - offset,  bottom + offset);
             cx.close_path();
 
             match workspace.state {
@@ -130,8 +132,10 @@ impl WorkspaceWidget {
     }
 
     fn handle_click(&self, (x, _y): (f64, f64)) {
-        for item in &self.model.borrow().items {
-            if item.position.contains(&x) {
+        let model = self.model.borrow();
+        let dpi   = model.config.dpi.get();
+        for item in &model.items {
+            if item.position.contains(&(x / dpi)) {
                 Command::new("/bin/bash")
                     .arg("-c")
                     .arg(format!("i3 workspace {}-{}", item.workspace.0, item.workspace.1))
