@@ -18,10 +18,10 @@ mod color;
 mod config;
 mod manager;
 mod monitor;
-mod panel;
+mod bar;
 mod status;
 mod widgets;
 
 fn main() {
-    relm::run::<panel::Panel>(()).unwrap();
+    relm::run::<bar::Bar>(()).unwrap();
 }

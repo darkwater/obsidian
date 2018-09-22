@@ -13,18 +13,18 @@ use ::widgets::monitor_bar::{MonitorBarMsg, MonitorBarWidget};
 use ::manager::{Manager, ManagerMsg};
 use ::monitor::Monitor;
 
-pub struct PanelModel {
+pub struct BarModel {
     monitors: Vec<Box<dyn Monitor>>,
 }
 
 #[derive(Msg)]
-pub enum PanelMsg {
+pub enum BarMsg {
     Quit,
 }
 
 #[allow(unused)] // We must store Components to keep their channels
-pub struct Panel {
-    model:       PanelModel,
+pub struct Bar {
+    model:       BarModel,
     config:      &'static Config,
     window:      gtk::Window,
     workspaces:  Component<WorkspaceWidget>,
@@ -32,13 +32,13 @@ pub struct Panel {
     bar_display: Component<MonitorBarWidget>,
 }
 
-impl Panel {
+impl Bar {
 }
 
-impl Update for Panel {
-    type Model = PanelModel;
+impl Update for Bar {
+    type Model = BarModel;
     type ModelParam = ();
-    type Msg = PanelMsg;
+    type Msg = BarMsg;
 
     fn model(_: &Relm<Self>, _: Self::ModelParam) -> Self::Model {
         Self::Model {
@@ -47,14 +47,14 @@ impl Update for Panel {
     }
 
     fn update(&mut self, msg: Self::Msg) {
-        use self::PanelMsg::*;
+        use self::BarMsg::*;
         match msg {
             Quit => gtk::main_quit(),
         }
     }
 }
 
-impl Widget for Panel {
+impl Widget for Bar {
     type Root = gtk::Window;
 
     fn root(&self) -> Self::Root {
@@ -125,9 +125,9 @@ impl Widget for Panel {
 
         let manager          = relm::execute::<Manager>(config);
         let bar_display      = container.add_widget::<MonitorBarWidget>(config);
-        // let popup_display = container.add_widget::<MonitorPanelWidget>(config);
+        // let popup_display = container.add_widget::<MonitorBarWidget>(config);
         connect_stream!(manager@ManagerMsg::DisplayUpdate(idx,    ref state), bar_display.stream(),   MonitorBarMsg::RecvUpdate(idx,   state.clone()));
-        // connect_stream!(manager@ManagerMsg::DisplayUpdate(idx, ref state), popup_display.stream(), MonitorPanelMsg::RecvUpdate(u));
+        // connect_stream!(manager@ManagerMsg::DisplayUpdate(idx, ref state), popup_display.stream(), MonitorBarMsg::RecvUpdate(u));
 
         window.show_all();
         window.set_keep_above(true);
@@ -144,9 +144,9 @@ impl Widget for Panel {
             Inhibit(false)
         });
 
-        connect!(relm, window, connect_delete_event(_, _), return (PanelMsg::Quit, Inhibit(false)));
+        connect!(relm, window, connect_delete_event(_, _), return (BarMsg::Quit, Inhibit(false)));
 
-        Panel {
+        Bar {
             model,
             config,
             window,
