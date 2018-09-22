@@ -6,7 +6,7 @@ use config::Config;
 use gdk::prelude::*;
 use gtk::Inhibit;
 use gtk::prelude::*;
-use relm::{Component, ContainerWidget, Relm, Update, Widget};
+use relm::{Component, ContainerWidget, EventStream, Relm, Update, Widget};
 
 use ::widgets::workspace::WorkspaceWidget;
 use ::widgets::monitor_bar::{MonitorBarMsg, MonitorBarWidget};
@@ -14,7 +14,6 @@ use ::manager::{Manager, ManagerMsg};
 use ::monitor::Monitor;
 
 pub struct PanelModel {
-    config:   &'static Config,
     monitors: Vec<Box<dyn Monitor>>,
 }
 
@@ -26,8 +25,10 @@ pub enum PanelMsg {
 #[allow(unused)] // We must store Components to keep their channels
 pub struct Panel {
     model:       PanelModel,
+    config:      &'static Config,
     window:      gtk::Window,
     workspaces:  Component<WorkspaceWidget>,
+    manager:     EventStream<ManagerMsg>,
     bar_display: Component<MonitorBarWidget>,
 }
 
@@ -36,15 +37,11 @@ impl Panel {
 
 impl Update for Panel {
     type Model = PanelModel;
-    type ModelParam = Config;
+    type ModelParam = ();
     type Msg = PanelMsg;
 
-    fn model(_: &Relm<Self>, config: Self::ModelParam) -> Self::Model {
-        let config = Box::new(config);
-        let config = Box::leak(config);
-
+    fn model(_: &Relm<Self>, _: Self::ModelParam) -> Self::Model {
         Self::Model {
-            config,
             monitors: vec![],
         }
     }
@@ -79,12 +76,17 @@ impl Widget for Panel {
         window.set_app_paintable(true);
         window.set_visual(Some(&visual));
 
-        if model.config.dpi.get() <= 0.0 {
-            model.config.dpi.set(screen.get_resolution() / 96.0);
+        let mut config = Config::default();
+
+        if config.dpi <= 0.0 {
+            config.dpi = screen.get_resolution() / 96.0;
         }
         screen.set_resolution(96.0);
 
-        let height = model.config.dpi_scale(25);
+        let height = config.dpi_scale(25);
+
+        let config = Box::new(config);
+        let config = Box::leak(config);
 
         let (x, y) = (monitor.x, monitor.y + monitor.height - height);
         let (width, height) = (monitor.width, height);
@@ -119,13 +121,13 @@ impl Widget for Panel {
         container.set_vexpand(true);
         window.add(&container);
 
-        let workspaces = container.add_widget::<WorkspaceWidget>(model.config);
+        let workspaces = container.add_widget::<WorkspaceWidget>(config);
 
-        let monitor_iface    = relm::execute::<::manager::Manager>(());
-        let bar_display      = container.add_widget::<MonitorBarWidget>(());
-        // let popup_display = container.add_widget::<MonitorPanelWidget>(());
-        connect_stream!(monitor_iface@ManagerMsg::DisplayUpdate(idx, ref state), bar_display.stream(), MonitorBarMsg::RecvUpdate(idx, state.clone()));
-        // connect_stream!(monitor_iface@ManagerMsg::DisplayUpdate(idx, ref state), popup_display.stream(), MonitorPanelMsg::RecvUpdate(u));
+        let manager          = relm::execute::<Manager>(config);
+        let bar_display      = container.add_widget::<MonitorBarWidget>(config);
+        // let popup_display = container.add_widget::<MonitorPanelWidget>(config);
+        connect_stream!(manager@ManagerMsg::DisplayUpdate(idx,    ref state), bar_display.stream(),   MonitorBarMsg::RecvUpdate(idx,   state.clone()));
+        // connect_stream!(manager@ManagerMsg::DisplayUpdate(idx, ref state), popup_display.stream(), MonitorPanelMsg::RecvUpdate(u));
 
         window.show_all();
         window.set_keep_above(true);
@@ -146,8 +148,10 @@ impl Widget for Panel {
 
         Panel {
             model,
+            config,
             window,
             workspaces,
+            manager,
             bar_display,
         }
     }

@@ -1,12 +1,14 @@
-use std::mem::transmute;
-
-use relm::{Channel, Component, ContainerWidget, Relm, Update, UpdateNew, Widget};
+use relm::{Channel, Relm, Update, UpdateNew};
 use relm_core::Sender;
 
+use ::color::Color;
+use ::config::Config;
 use ::monitor::*;
+use ::status::*;
 
 pub struct ManagerModel {
-    monitors: Vec<Option<(Box<dyn Monitor>, MonitorState)>>,
+    monitors: Vec<MonitorState>,
+    channels: Vec<Channel<MonitorMsg>>,
 }
 
 #[derive(Debug, Msg)]
@@ -23,6 +25,7 @@ pub struct Manager {
 #[derive(Clone, Debug)]
 pub struct MonitorState {
     pub text:      String,
+    pub color:     Color,
     pub relevance: Relevance,
     pub location:  DisplayLocation,
 }
@@ -39,6 +42,7 @@ fn create_channel(relm: &Relm<Manager>, idx: usize) -> (Channel<MonitorMsg>, Sen
 fn empty_state() -> MonitorState {
     MonitorState {
         text:      String::new(),
+        color:     Color::white(),
         relevance: Relevance::Background,
         location:  DisplayLocation::Hidden,
     }
@@ -46,28 +50,32 @@ fn empty_state() -> MonitorState {
 
 impl Update for Manager {
     type Model      = ManagerModel;
-    type ModelParam = ();
+    type ModelParam = &'static Config;
     type Msg        = ManagerMsg;
 
-    fn model(relm: &Relm<Self>, _params: Self::ModelParam) -> Self::Model {
-        let mut monitors: Vec<Option<(Box<dyn Monitor>, MonitorState)>> = vec![];
+    fn model(relm: &Relm<Self>, config: Self::ModelParam) -> Self::Model {
+        let mut monitors = vec![];
+        let mut channels = vec![];
 
-        let clock = Clock::new();
+        let battery = Battery::default();
         let (ch, sx) = create_channel(relm, monitors.len());
-        clock.start(sx);
-        monitors.push(Some((Box::new(clock), empty_state())));
+        battery.start(config, sx);
+        monitors.push(empty_state());
+        channels.push(ch);
 
-        let clock = Clock::new();
+        let clock = Clock::default();
         let (ch, sx) = create_channel(relm, monitors.len());
-        clock.start(sx);
-        monitors.push(Some((Box::new(clock), empty_state())));
+        clock.start(config, sx);
+        monitors.push(empty_state());
+        channels.push(ch);
 
         ManagerModel {
-            monitors,
+            monitors, channels,
         }
     }
 
     fn update(&mut self, msg: Self::Msg) {
+        println!("{:#?}", msg);
         use self::ManagerMsg::*;
         match msg {
             RecvMsg(i, m)   => self.recv_msg(i, m),
@@ -78,25 +86,22 @@ impl Update for Manager {
 
 impl Manager {
     fn recv_msg(&mut self, idx: usize, msg: MonitorMsg) {
-        let state = &mut self.model.monitors[idx].as_mut().expect("removed monitor still sends updates").1;
+        let state = &mut self.model.monitors[idx];
 
         match msg {
             MonitorMsg::SetText(s) => state.text = s,
+            MonitorMsg::SetColor(c) => state.color = c,
             MonitorMsg::SetRelevance(r) => {
-                let new_location = match r {
+                state.location = match r {
                     Relevance::Urgent     => DisplayLocation::Bar,
                     Relevance::Background => DisplayLocation::Popup,
                 };
 
                 state.relevance = r;
-
-                if state.location != new_location {
-                    state.location = new_location;
-
-                    self.relm.stream().emit(ManagerMsg::DisplayUpdate(idx, state.clone()));
-                }
             }
         }
+
+        self.relm.stream().emit(ManagerMsg::DisplayUpdate(idx, state.clone()));
     }
 }
 

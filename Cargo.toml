@@ -11,6 +11,7 @@ gdk-sys      = "0.7.0"
 glib         = "0.6.0"
 gtk          = { version = "0.5.0", features = [ "v3_20" ] }
 i3ipc        = "0.8.2"
+itertools    = "0.7.8"
 mpd          = { git = "https://github.com/kstep/rust-mpd" }
 pango        = "0.5.0"
 pangocairo   = "0.6.0"

@@ -7,17 +7,19 @@ extern crate relm_core;
 
 use std::cell::RefCell;
 use std::mem;
-use std::ops::Range;
 use std::rc::Rc;
 
 use gtk::prelude::*;
 use self::pango::prelude::LayoutExt;
-use relm::{Channel, Relm, Update, Widget};
+use relm::{Relm, Update, Widget};
 
-use ::monitor::*;
+use ::color::Color;
+use ::config::Config;
 use ::manager::*;
+use ::monitor::*;
 
 pub struct MonitorBarModel {
+    config: &'static Config,
     states: Vec<Option<MonitorState>>,
     displayed: Vec<usize>,
 }
@@ -40,10 +42,10 @@ impl MonitorBarWidget {
 
         let mut text = String::new();
         for item in &model.displayed {
-            text.push_str(&format!(" [ item {} ] ", item));
+            text.push_str(&format!(" [ {} ] ", model.states[*item].as_ref().unwrap().text));
         }
 
-        let font = pango::FontDescription::from_string("Droid Sans Mono 10");
+        let font = pango::FontDescription::from_string(&format!("Droid Sans Mono {}", model.config.dpi_scale(10)));
         let layout = pangocairo::functions::create_layout(context).unwrap();
         layout.set_text(&text);
         layout.set_font_description(Some(&font));
@@ -57,8 +59,8 @@ impl MonitorBarWidget {
         let x = -icon_x as f64;
         let y = -icon_y as f64 + height / 2.0 - icon_height / 2.0;
 
-        // let Color(r, g, b, a) = self.color;
-        context.set_source_rgba(1.0, 1.0, 1.0, 1.0);
+        let Color(r, g, b, a) = model.states[0].as_ref().unwrap().color;
+        context.set_source_rgba(r, g, b, a);
 
         context.move_to(x, y);
         pangocairo::functions::show_layout(&context, &layout);
@@ -91,8 +93,6 @@ impl MonitorBarWidget {
                 }
             },
         }
-
-        self.widget.queue_draw();
     }
 
     fn show_state(model: &mut MonitorBarModel, idx: usize) {
@@ -120,12 +120,13 @@ impl MonitorBarWidget {
 
 impl Update for MonitorBarWidget {
     type Model = MonitorBarModel;
-    type ModelParam = ();
+    type ModelParam = &'static Config;
     type Msg = MonitorBarMsg;
 
     // Return the initial model.
-    fn model(relm: &Relm<Self>, _param: Self::ModelParam) -> Self::Model {
+    fn model(relm: &Relm<Self>, config: Self::ModelParam) -> Self::Model {
         MonitorBarModel {
+            config: config,
             states: vec![],
             displayed: vec![],
         }

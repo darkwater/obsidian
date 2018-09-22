@@ -64,7 +64,7 @@ impl WorkspaceWidget {
     fn render(model: &WorkspaceModel, widget: &gtk::DrawingArea, cx: &cairo::Context) {
         let width  = widget.get_allocated_width()  as f64;
         let height = widget.get_allocated_height() as f64;
-        let dpi    = model.config.dpi.get();
+        let dpi    = model.config.dpi;
 
         if model.items.is_empty() { return }
 
@@ -74,6 +74,10 @@ impl WorkspaceWidget {
 
         let required_width = model.items.last().unwrap().position.end * dpi + skew + 5.0;
         if required_width > width {
+            widget.set_size_request(required_width as i32 + 5, height as i32);
+            return;
+        }
+        if required_width < width - 10.0 {
             widget.set_size_request(required_width as i32 + 5, height as i32);
             return;
         }
@@ -133,9 +137,8 @@ impl WorkspaceWidget {
 
     fn handle_click(&self, (x, _y): (f64, f64)) {
         let model = self.model.borrow();
-        let dpi   = model.config.dpi.get();
         for item in &model.items {
-            if item.position.contains(&(x / dpi)) {
+            if item.position.contains(&(x / model.config.dpi)) {
                 Command::new("/bin/bash")
                     .arg("-c")
                     .arg(format!("i3 workspace {}-{}", item.workspace.0, item.workspace.1))
