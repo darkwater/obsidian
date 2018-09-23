@@ -70,7 +70,7 @@ impl WorkspaceWidget {
 
         let workspace_height = height * 0.25;
         let skew_ratio = 0.2;
-        let skew = workspace_height * skew_ratio * dpi;
+        let skew = workspace_height * skew_ratio;
 
         let required_width = model.items.last().unwrap().position.end * dpi + skew + 5.0;
         if required_width > width {
@@ -85,11 +85,12 @@ impl WorkspaceWidget {
         let first_workspace = model.items.first().unwrap() as *const Item;
         let last_workspace  = model.items.last().unwrap() as *const Item;
 
-        let line_width = (1.0 * dpi).floor();
-        cx.set_line_width(line_width);
+        let line_width = (1.0 * dpi).floor() * 2.0;
 
         let top    = (height / 2.0 - workspace_height / 2.0).ceil();
         let bottom = (height / 2.0 + workspace_height / 2.0).floor();
+
+        cx.set_operator(cairo::Operator::Source);
 
         for workspace in &model.items {
             let mut left_top     = workspace.position.start * dpi;
@@ -100,23 +101,6 @@ impl WorkspaceWidget {
             if workspace as *const Item != first_workspace { left_top  += skew; left_bottom  -= skew; }
             if workspace as *const Item != last_workspace  { right_top += skew; right_bottom -= skew; }
 
-            let offset = 0.5 * line_width;
-            cx.move_to(left_top - offset,     top - offset);
-            cx.line_to(right_top + offset,    top - offset);
-            cx.line_to(right_bottom + offset, bottom + offset);
-            cx.line_to(left_bottom - offset,  bottom + offset);
-            cx.close_path();
-
-            match workspace.state {
-                State::Urgent    => cx.set_source_rgba(1.0, 0.7, 0.0, 0.9),
-                State::Active    => cx.set_source_rgba(1.0, 1.0, 1.0, 1.0),
-                State::Visible   => cx.set_source_rgba(1.0, 1.0, 1.0, 0.7),
-                State::Inhibited => cx.set_source_rgba(1.0, 1.0, 1.0, 0.3),
-                State::Phantom   => cx.set_source_rgba(1.0, 1.0, 1.0, 0.3),
-            }
-
-            cx.stroke();
-
             cx.move_to(left_top,     top);
             cx.line_to(right_top,    top);
             cx.line_to(right_bottom, bottom);
@@ -124,13 +108,25 @@ impl WorkspaceWidget {
             cx.close_path();
 
             match workspace.state {
-                State::Urgent    => cx.set_source_rgba(1.0, 0.6, 0.0, 0.7),
-                State::Active    => cx.set_source_rgba(1.0, 1.0, 1.0, 0.8),
-                State::Visible   => cx.set_source_rgba(1.0, 1.0, 1.0, 0.3),
-                State::Inhibited => cx.set_source_rgba(1.0, 1.0, 1.0, 0.3),
-                State::Phantom   => cx.set_source_rgba(0.0, 0.0, 0.0, 0.2),
+                State::Urgent    => cx.set_source_rgba(1.0, 0.7, 0.0, 0.92),
+                State::Active    => cx.set_source_rgba(1.0, 1.0, 1.0, 0.92),
+                State::Visible   => cx.set_source_rgba(0.7, 0.7, 0.7, 0.92),
+                State::Inhibited => cx.set_source_rgba(0.4, 0.4, 0.4, 0.92),
+                State::Phantom   => cx.set_source_rgba(0.4, 0.4, 0.4, 0.92),
             }
 
+            cx.set_line_width(line_width);
+            cx.stroke_preserve();
+
+            match workspace.state {
+                State::Urgent    => cx.set_source_rgba(1.0, 0.7, 0.0, 0.92),
+                State::Active    => cx.set_source_rgba(0.8, 0.8, 0.8, 0.92),
+                State::Visible   => cx.set_source_rgba(0.4, 0.4, 0.4, 0.92),
+                State::Inhibited => cx.set_source_rgba(0.4, 0.4, 0.4, 0.92),
+                State::Phantom   => cx.set_source_rgba(0.1, 0.1, 0.1, 0.92),
+            }
+
+            cx.set_line_width(0.0);
             cx.fill();
         }
     }

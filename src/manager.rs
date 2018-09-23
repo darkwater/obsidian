@@ -8,6 +8,8 @@ use ::status::*;
 
 pub struct ManagerModel {
     monitors: Vec<MonitorState>,
+
+    #[allow(unused)] // we need to store the channels but we dont actually use them like this
     channels: Vec<Channel<MonitorMsg>>,
 }
 
@@ -75,7 +77,6 @@ impl Update for Manager {
     }
 
     fn update(&mut self, msg: Self::Msg) {
-        println!("{:#?}", msg);
         use self::ManagerMsg::*;
         match msg {
             RecvMsg(i, m)   => self.recv_msg(i, m),
